@@ -407,6 +407,16 @@ model Company {
   taxReturns        TaxReturn[]
   transactions      BusinessTransaction[]
   complianceEntries ComplianceCalendarEntry[]
+
+  // Phase 2 — accounting
+  accounts          Account[]
+  journalEntries    JournalEntry[]
+  customers         Customer[]
+  suppliers         Supplier[]
+  invoices          Invoice[]
+  expenses          Expense[]
+  accountingPayments AccountingPayment[]
+  assets            Asset[]
 }
 
 // A company may have zero or many branches, each in its own state, each potentially
@@ -676,4 +686,313 @@ model ComplianceCalendarEntry {
   createdAt             DateTime @default(now())
 
   @@index([companyId, statutoryDeadline])
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PHASE 2 — Double-entry accounting engine (master-build-prompt §6, §31, §54)
+// Design principles:
+//  1. A JournalEntry, once POSTED, is never edited or deleted (brief §11 "never overwrite
+//     source transactions"; §41 "no database reset"). Correcting a posted entry means
+//     posting a new reversing entry (status VOID on the original, linked via reversalOfId).
+//  2. Debits must equal credits on every JournalEntry — enforced in code
+//     (src/accounting/doubleEntry.ts), not just trusted at the DB layer, because Prisma/SQL
+//     cannot express "sum(debit) = sum(credit) across sibling rows" as a constraint.
+//  3. Everything here is organizationId + companyId scoped — same tenant-isolation
+//     discipline as Phase 1's Company/CompaniesService.
+// ═════════════════════════════════════════════════════════════════════════
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+// Chart of accounts. Hierarchical (parentAccountId) so e.g. "Current Assets" can group
+// "Cash", "Accounts Receivable", "Inventory" underneath it for reporting roll-ups.
+model Account {
+  id             String      @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company     @relation(fields: [companyId], references: [id])
+  code           String      // e.g. "1000", "4000" — user-facing account numbering
+  name           String
+  type           AccountType
+  parentAccountId String?
+  parentAccount   Account?   @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts   Account[]  @relation("AccountHierarchy")
+  isSystemAccount Boolean    @default(false) // true for default CoA accounts the UI shouldn't let a user delete
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+
+  journalLines    JournalLine[]
+
+  @@unique([companyId, code])
+  @@index([organizationId, companyId])
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum JournalEntrySource {
+  MANUAL
+  INVOICE
+  EXPENSE
+  PAYMENT
+  ASSET_ACQUISITION
+  DEPRECIATION
+  BANK_IMPORT
+  ADJUSTMENT
+  SYSTEM
+}
+
+model JournalEntry {
+  id             String              @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company             @relation(fields: [companyId], references: [id])
+  entryDate      DateTime
+  description    String
+  source         JournalEntrySource
+  sourceId       String?             // id of the Invoice/Expense/Asset/etc. that generated this entry, if any
+  documentReference String?
+  status         JournalEntryStatus  @default(DRAFT)
+  reversalOfId   String?             @unique
+  reversalOf     JournalEntry?       @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversedBy     JournalEntry[]      @relation("JournalReversal")
+  createdBy      String              // userId
+  approvedBy     String?             // userId — set when a workflow requiring approval is used
+  postedAt       DateTime?
+  createdAt      DateTime            @default(now())
+
+  lines          JournalLine[]
+
+  @@index([organizationId, companyId, entryDate])
+  @@index([source, sourceId])
+}
+
+// debitNgn/creditNgn are deliberately BOTH present (rather than one signed "amount" column)
+// because that is how a ledger line is actually presented/audited — exactly one of the two
+// must be > 0 and the other exactly 0, enforced in src/accounting/doubleEntry.ts.
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  debitNgn       Decimal      @default(0) @db.Decimal(18, 2)
+  creditNgn      Decimal      @default(0) @db.Decimal(18, 2)
+  description    String?
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id])
+  supplierId     String?
+  supplier       Supplier?    @relation(fields: [supplierId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  createdAt      DateTime @default(now())
+
+  invoices       Invoice[]
+  journalLines   JournalLine[]
+  payments       AccountingPayment[]
+
+  @@index([organizationId, companyId])
+}
+
+model Supplier {
+  id             String   @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  createdAt      DateTime @default(now())
+
+  expenses       Expense[]
+  journalLines   JournalLine[]
+  payments       AccountingPayment[]
+
+  @@index([organizationId, companyId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  VOID
+  OVERDUE
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  invoiceNumber  String
+  issueDate      DateTime
+  dueDate        DateTime
+  status         InvoiceStatus @default(DRAFT)
+  subtotalNgn    Decimal       @db.Decimal(18, 2)
+  vatAmountNgn   Decimal       @default(0) @db.Decimal(18, 2)
+  totalNgn       Decimal       @db.Decimal(18, 2)
+  amountPaidNgn  Decimal       @default(0) @db.Decimal(18, 2)
+  notes          String?
+  journalEntryId String?       @unique // set once posted to the GL
+  createdAt      DateTime      @default(now())
+
+  items          InvoiceItem[]
+  payments       AccountingPayment[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([organizationId, companyId, status])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  quantity    Decimal @db.Decimal(14, 2)
+  unitPriceNgn Decimal @db.Decimal(18, 2)
+  vatRate     Decimal @default(0) @db.Decimal(6, 4) // e.g. 0.075 — a RATE, never hardcoded in logic; see note in InvoicesService
+  lineTotalNgn Decimal @db.Decimal(18, 2)
+}
+
+enum ExpenseStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+model Expense {
+  id             String        @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  supplierId     String?
+  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
+  expenseDate    DateTime
+  description    String
+  status         ExpenseStatus @default(DRAFT)
+  subtotalNgn    Decimal       @db.Decimal(18, 2)
+  vatAmountNgn   Decimal       @default(0) @db.Decimal(18, 2)
+  totalNgn       Decimal       @db.Decimal(18, 2)
+  amountPaidNgn  Decimal       @default(0) @db.Decimal(18, 2)
+  journalEntryId String?       @unique
+  createdAt      DateTime      @default(now())
+
+  items          ExpenseItem[]
+  payments       AccountingPayment[]
+
+  @@index([organizationId, companyId, status])
+}
+
+model ExpenseItem {
+  id          String  @id @default(cuid())
+  expenseId   String
+  expense     Expense @relation(fields: [expenseId], references: [id])
+  accountId   String  // which expense account this line hits, e.g. "Rent", "Utilities"
+  description String
+  amountNgn   Decimal @db.Decimal(18, 2)
+}
+
+enum PaymentDirection {
+  RECEIPT // money IN from a customer
+  DISBURSEMENT // money OUT to a supplier
+}
+
+// Named AccountingPayment (not Payment) to avoid colliding with the Phase-1 tax-engine
+// Payment model, which tracks tax liability settlement, not AR/AP cash application.
+model AccountingPayment {
+  id             String           @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company          @relation(fields: [companyId], references: [id])
+  direction      PaymentDirection
+  amountNgn      Decimal          @db.Decimal(18, 2)
+  paymentDate    DateTime
+  method         String?          // "BANK_TRANSFER" | "CASH" | "CARD" | "USSD" | ...
+  reference      String?
+  invoiceId      String?
+  invoice        Invoice?         @relation(fields: [invoiceId], references: [id])
+  expenseId      String?
+  expense        Expense?         @relation(fields: [expenseId], references: [id])
+  customerId     String?
+  customer       Customer?        @relation(fields: [customerId], references: [id])
+  supplierId     String?
+  supplier       Supplier?        @relation(fields: [supplierId], references: [id])
+  journalEntryId String?          @unique
+  createdAt      DateTime         @default(now())
+
+  @@index([organizationId, companyId])
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+enum AssetStatus {
+  ACTIVE
+  DISPOSED
+}
+
+// ACCOUNTING asset register — distinct from the tax-engine's CapitalAsset/
+// CapitalAllowanceClaim models (src/engine/capitalAllowance.ts). The two are never merged:
+// accounting depreciation follows the company's own policy/useful-life estimate, while tax
+// capital allowance follows NTA First Schedule Table I rates. See research report §2.6.
+model Asset {
+  id               String             @id @default(cuid())
+  organizationId   String
+  companyId        String
+  company          Company            @relation(fields: [companyId], references: [id])
+  description      String
+  category         String?
+  acquisitionDate  DateTime
+  costNgn          Decimal            @db.Decimal(18, 2)
+  salvageValueNgn  Decimal            @default(0) @db.Decimal(18, 2)
+  usefulLifeMonths Int
+  depreciationMethod DepreciationMethod @default(STRAIGHT_LINE)
+  accumulatedDepreciationNgn Decimal   @default(0) @db.Decimal(18, 2)
+  status           AssetStatus         @default(ACTIVE)
+  disposalDate     DateTime?
+  disposalProceedsNgn Decimal?         @db.Decimal(18, 2)
+  journalEntryId   String?             @unique // acquisition posting
+  createdAt        DateTime            @default(now())
+
+  depreciationEntries AssetDepreciationEntry[]
+
+  @@index([organizationId, companyId])
+}
+
+model AssetDepreciationEntry {
+  id             String   @id @default(cuid())
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  periodYear     Int
+  periodMonth    Int
+  amountNgn      Decimal  @db.Decimal(18, 2)
+  journalEntryId String?  @unique
+  createdAt      DateTime @default(now())
+
+  @@unique([assetId, periodYear, periodMonth])
 }
