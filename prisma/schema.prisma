@@ -424,6 +424,10 @@ model Company {
   bankTransactions  BankTransaction[]
   reconciliations   Reconciliation[]
   documents         Document[]
+
+  // Phases 4-6 — audit engine, scenarios
+  auditRuns         AuditRun[]
+  scenarios         Scenario[]
 }
 
 // A company may have zero or many branches, each in its own state, each potentially
@@ -1168,4 +1172,141 @@ model Document {
 
   @@index([organizationId, companyId, category])
   @@index([linkedEntityType, linkedEntityId])
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PHASES 4-6 — Financial statements (derived on demand, not snapshotted —
+// immutable POSTED entries, Phase 2, mean they're always reproducible),
+// audit engine, and profit/loss scenarios (master-build-prompt §10-14, §24-25)
+// ═════════════════════════════════════════════════════════════════════════
+
+enum AuditRunType {
+  NORMAL_AUDIT
+}
+
+enum AuditRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model AuditRun {
+  id             String         @id @default(cuid())
+  organizationId String
+  companyId      String
+  company        Company        @relation(fields: [companyId], references: [id])
+  runType        AuditRunType   @default(NORMAL_AUDIT)
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         AuditRunStatus @default(RUNNING)
+  runBy          String
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  findings       AuditFinding[]
+
+  @@index([organizationId, companyId, periodStart])
+}
+
+enum FindingCategory {
+  DUPLICATE_TRANSACTION
+  MISSING_DOCUMENTATION
+  UNUSUAL_TRANSACTION
+  LARGE_TRANSACTION
+  ROUND_NUMBER_ANOMALY
+  UNRECONCILED_BANK_TRANSACTION
+  TAX_CONSISTENCY
+  PERIOD_CUTOFF
+  REPEATED_VENDOR_OR_CUSTOMER
+  UNBALANCED_LEDGER
+}
+
+enum FindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FindingStatus {
+  OPEN
+  REQUIRES_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+// Terminology is deliberately neutral (brief §10: "Potential anomaly", "Requires review",
+// never an accusation of fraud) — see the description text generated in audit.service.ts.
+model AuditFinding {
+  id               String           @id @default(cuid())
+  auditRunId       String
+  auditRun         AuditRun         @relation(fields: [auditRunId], references: [id])
+  category         FindingCategory
+  severity         FindingSeverity
+  description      String
+  relatedEntityType String?
+  relatedEntityId   String?
+  status            FindingStatus   @default(OPEN)
+  resolutionNotes   String?
+  createdAt         DateTime        @default(now())
+
+  @@index([auditRunId, category])
+}
+
+enum ScenarioType {
+  NORMAL
+  PROFIT_SCENARIO
+  LOSS_SCENARIO
+}
+
+// A Scenario is a VERSIONED, REPRODUCIBLE snapshot (brief §47-48): it freezes exactly
+// which unposted records were treated as hypothetically-included and the calculationVersion
+// of the code that computed it, so re-rendering the same scenario later never silently
+// drifts even if the underlying DRAFT invoices/expenses are edited afterward.
+model Scenario {
+  id                   String       @id @default(cuid())
+  organizationId       String
+  companyId            String
+  company              Company      @relation(fields: [companyId], references: [id])
+  scenarioType         ScenarioType
+  periodStart          DateTime
+  periodEnd            DateTime
+  calculationVersion   String
+  accountingProfitNgn  Decimal      @db.Decimal(18, 2)
+  taxableProfitNgn     Decimal      @db.Decimal(18, 2)
+  taxLiabilityNgn      Decimal      @db.Decimal(18, 2)
+  breakdown            Json         // full transparent calculation, brief §24 style
+  generatedBy          String
+  createdAt            DateTime     @default(now())
+
+  adjustments          ScenarioAdjustment[]
+
+  @@index([organizationId, companyId, scenarioType, periodStart])
+}
+
+enum ScenarioAdjustmentApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Every adjustment traces to a REAL existing record (a DRAFT Invoice/Expense, or an
+// Asset's own depreciation formula) — sourceId always resolves to that record. Nothing
+// here is ever a fabricated figure (brief §12: "Do not invent transactions... Do not
+// manipulate figures simply to achieve a target profit").
+model ScenarioAdjustment {
+  id                 String                     @id @default(cuid())
+  scenarioId         String
+  scenario           Scenario                   @relation(fields: [scenarioId], references: [id])
+  sourceType         String                     // "Invoice" | "Expense" | "AssetDepreciation"
+  sourceId           String
+  description        String
+  originalValueNgn   Decimal                    @db.Decimal(18, 2) // always 0 — not yet in the ledger
+  adjustedValueNgn   Decimal                    @db.Decimal(18, 2)
+  accountingTreatment String
+  taxTreatment        String?
+  confidence           String                    // ConfidenceLevel from the tax engine's shared vocabulary
+  approvalStatus        ScenarioAdjustmentApproval @default(PENDING)
+  createdAt              DateTime                  @default(now())
+
+  @@index([scenarioId])
 }

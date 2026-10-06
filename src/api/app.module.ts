@@ -19,6 +19,9 @@ import { BankAccountsModule } from "./bank-accounts/bank-accounts.module";
 import { BankImportModule } from "./bank-import/bank-import.module";
 import { ReconciliationModule } from "./reconciliation/reconciliation.module";
 import { DocumentsModule } from "./documents/documents.module";
+import { FinancialStatementsModule } from "./financial-statements/financial-statements.module";
+import { AuditModule } from "./audit/audit.module";
+import { ScenariosModule } from "./scenarios/scenarios.module";
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { DocumentsModule } from "./documents/documents.module";
     BankImportModule,
     ReconciliationModule,
     DocumentsModule,
+    FinancialStatementsModule,
+    AuditModule,
+    ScenariosModule,
   ],
 })
 export class AppModule {}
