@@ -1,0 +1,109 @@
+/**
+ * Shared domain types for the Nigeria tax rules engine.
+ * Kept independent of Prisma's generated types so the engine can run against
+ * either a real database or the JSON rule-seed fixture used in tests/offline dev.
+ */
+
+export type TaxType =
+  | "CIT"
+  | "DEVELOPMENT_LEVY"
+  | "VAT"
+  | "WHT"
+  | "PAYE"
+  | "CAPITAL_ALLOWANCE"
+  | "TAX_LOSS"
+  | "CAPITAL_GAINS_TAX"
+  | "STAMP_DUTY"
+  | "STATE_LEVY"
+  | "GENERAL";
+
+export type RuleStatus =
+  | "DRAFT"
+  | "REQUIRES_REVIEW"
+  | "DRAFT_VERIFIED"
+  | "APPROVED"
+  | "ACTIVE"
+  | "SUPERSEDED"
+  | "REJECTED"
+  | "DEACTIVATED";
+
+/**
+ * Statuses that are safe to use in a live calculation.
+ * DRAFT_VERIFIED is deliberately excluded: the regulatory brief requires a qualified tax
+ * professional's approval before a source-confirmed figure may be relied on in production.
+ */
+export const USABLE_RULE_STATUSES: ReadonlySet<RuleStatus> = new Set(["APPROVED", "ACTIVE"]);
+
+export type ConfidenceLevel =
+  | "VERIFIED_RULE"
+  | "VERIFIED_CALCULATION"
+  | "REQUIRES_REVIEW"
+  | "MISSING_REGULATORY_INFORMATION"
+  | "POTENTIAL_REGULATORY_CHANGE"
+  | "UNSUPPORTED_SCENARIO";
+
+export interface RuleRecord<TValue = unknown> {
+  id: string;
+  taxType: TaxType;
+  jurisdiction: string; // "NG-FEDERAL" | "NG-STATE" | "NG-STATE:<code>"
+  ruleKey: string;
+  description: string;
+  value: TValue;
+  valueType: string;
+  conditions?: Record<string, unknown>;
+  effectiveFrom: string; // ISO date
+  effectiveTo: string | null;
+  sourceDocument: string | null;
+  sourceUrl: string | null;
+  sourceReference: string | null;
+  ruleVersion: string;
+  status: RuleStatus;
+  verificationDate: string | null;
+  verifiedBy: string | null;
+}
+
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  isResident: boolean;
+  isProfessionalServices: boolean;
+  turnoverNgn: number;
+  fixedAssetsNgn: number;
+  vatRegisteredVoluntarily: boolean;
+  employeeCount: number;
+  sector?: string;
+  accountingYearEnd: string; // "MM-DD"
+  incorporationDate: string; // ISO date
+}
+
+export interface ApplicabilityResult {
+  taxType: TaxType;
+  applicable: boolean;
+  reason: string;
+  confidence: ConfidenceLevel;
+  ruleIdsUsed: string[];
+}
+
+/** Any engine output that cites the rule(s) it relied on, for auditability. */
+export interface Explainable {
+  explanation: string;
+  confidence: ConfidenceLevel;
+  ruleIdsUsed: string[];
+}
+
+export class UnverifiedRuleError extends Error {
+  constructor(ruleKey: string, status: RuleStatus) {
+    super(
+      `Rule "${ruleKey}" has status "${status}" and cannot be used in a calculation. ` +
+        `Only APPROVED or ACTIVE rules may drive a live tax result — see brief §38/§22.`
+    );
+    this.name = "UnverifiedRuleError";
+  }
+}
+
+export class NoApplicableRuleError extends Error {
+  constructor(ruleKey: string, asOfDate: string) {
+    super(`No rule found for "${ruleKey}" effective on ${asOfDate}.`);
+    this.name = "NoApplicableRuleError";
+  }
+}

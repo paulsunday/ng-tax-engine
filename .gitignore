@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+monitoring/change_log/
+.env
+.env.local

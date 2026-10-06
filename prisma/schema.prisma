@@ -1,0 +1,568 @@
+// Nigeria Tax Rules Engine — data model
+// Design principles (see research/REGULATORY_RESEARCH_REPORT.md):
+//  1. No statutory figure is a literal in code — every number lives in a TaxRule row with full source metadata.
+//  2. Rules are effective-dated and versioned; a filed TaxReturn freezes the rule_version it used, so historical
+//     returns are reproducible forever even after the rule changes (brief §25-26).
+//  3. Rule edits never overwrite history — TaxRuleVersion rows are append-only; TaxRule points at the
+//     "current" version but old versions remain queryable.
+//  4. Capital allowance (tax) and depreciation (accounting) are modelled as separate tables on purpose (brief §14).
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ───────────────────────────── Reference / lookup tables ─────────────────────────────
+
+enum TaxType {
+  CIT
+  DEVELOPMENT_LEVY
+  VAT
+  WHT
+  PAYE
+  CAPITAL_ALLOWANCE
+  TAX_LOSS
+  CAPITAL_GAINS_TAX
+  STAMP_DUTY
+  STATE_LEVY
+  GENERAL
+}
+
+enum Jurisdiction {
+  NG_FEDERAL
+  NG_STATE
+  NG_LOCAL
+}
+
+enum RuleStatus {
+  DRAFT              // newly authored, not yet reviewed
+  REQUIRES_REVIEW     // source unverified / ambiguous — must never be used in a live calculation
+  DRAFT_VERIFIED       // source-confirmed by research pass, awaiting tax-professional approval
+  APPROVED             // approved by a qualified tax professional, not yet activated
+  ACTIVE               // live — usable for calculations within its effective window
+  SUPERSEDED           // replaced by a newer rule_version; kept for historical reproducibility
+  REJECTED             // reviewed and rejected — never used
+  DEACTIVATED          // administrator deactivated (e.g. erroneous rule caught before use)
+}
+
+enum ConfidenceLevel {
+  VERIFIED_RULE
+  VERIFIED_CALCULATION
+  REQUIRES_REVIEW
+  MISSING_REGULATORY_INFORMATION
+  POTENTIAL_REGULATORY_CHANGE
+  UNSUPPORTED_SCENARIO
+}
+
+// Taxpayer/company classification axes (brief §8). Kept as rows, not enums, because new
+// classifications (e.g. a new sector carve-out) must be addable without a code deploy.
+model TaxpayerCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. "SMALL_COMPANY", "NON_RESIDENT_COMPANY", "PROFESSIONAL_SERVICES"
+  label       String
+  description String
+  sourceRef   String?  // statutory basis for the category existing at all
+  createdAt   DateTime @default(now())
+
+  companyClassifications CompanyClassification[]
+}
+
+// ───────────────────────────── Rule engine core ─────────────────────────────
+
+// One row per distinct rule concept (e.g. "cit_standard_rate"). Points at whichever
+// TaxRuleVersion is currently ACTIVE; all versions remain in TaxRuleVersion for history.
+model TaxRule {
+  id            String       @id @default(cuid())
+  ruleKey       String       // e.g. "cit_standard_rate", "vat_filing_deadline_rule"
+  taxType       TaxType
+  jurisdiction  Jurisdiction
+  stateCode     String?      // populated when jurisdiction = NG_STATE
+  description   String
+  createdAt     DateTime     @default(now())
+
+  versions      TaxRuleVersion[]
+
+  @@unique([ruleKey, taxType, jurisdiction, stateCode])
+  @@index([taxType, jurisdiction])
+}
+
+// Append-only. Never edit a row here after it has been referenced by a filed TaxReturn —
+// instead create a new TaxRuleVersion with a later effective_from and mark the old one SUPERSEDED.
+model TaxRuleVersion {
+  id               String      @id @default(cuid())
+  taxRuleId        String
+  taxRule          TaxRule     @relation(fields: [taxRuleId], references: [id])
+  ruleVersion      String      // semantic, e.g. "1.0", "1.1"
+  value            Json        // shape depends on rule: percentage, band table, deadline rule, object...
+  conditions       Json?       // eligibility conditions (company classification, recipient type, etc.)
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  status           RuleStatus  @default(DRAFT)
+  confidence       ConfidenceLevel @default(REQUIRES_REVIEW)
+
+  sourceId         String
+  source           TaxRuleSource @relation(fields: [sourceId], references: [id])
+  sourceReference  String       // section/paragraph/schedule within the source document
+
+  verificationDate DateTime?
+  verifiedBy       String?      // person or process that confirmed the figure against source text
+
+  approvedBy       String?      // qualified tax professional — required before status can become ACTIVE
+  approvedAt       DateTime?
+  rejectedReason   String?
+
+  supersedesId     String?      @unique
+  supersedes       TaxRuleVersion? @relation("RuleSupersession", fields: [supersedesId], references: [id])
+  supersededBy     TaxRuleVersion[] @relation("RuleSupersession")
+
+  changeRecordId   String?
+  changeRecord     RegulatoryChangeRecord? @relation(fields: [changeRecordId], references: [id])
+
+  createdAt        DateTime    @default(now())
+
+  taxReturnUsages  TaxReturnRuleUsage[]
+
+  @@index([taxRuleId, effectiveFrom, effectiveTo])
+  @@index([status])
+}
+
+// Every rule must cite one of these. This is the "source hierarchy" object from the brief §2/§23.
+model TaxRuleSource {
+  id                String   @id @default(cuid())
+  title             String   // e.g. "Nigeria Tax Act, 2025 (Act No. 7 of 2025)"
+  issuingAuthority  String   // e.g. "National Assembly / Federal Government Printer"
+  sourceTier        Int      // 1=legislation ... 8=public notice, per brief §2 hierarchy
+  publicationDate   DateTime?
+  effectiveDate     DateTime?
+  url               String
+  localArchivePath  String?  // path to the extracted/raw text snapshot kept under research/
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  ruleVersions      TaxRuleVersion[]
+  deadlineRules     TaxDeadlineRule[]
+  penaltyRules      TaxPenaltyRule[]
+  interestRules     TaxInterestRule[]
+  transitionRules   TaxTransitionRule[]
+}
+
+// Detect → Review → Validate → Approve → New version → Test → Deploy (brief §21/§39).
+// A detected change NEVER mutates a TaxRuleVersion directly — it only ever proposes one.
+model RegulatoryChangeRecord {
+  id              String    @id @default(cuid())
+  detectedAt      DateTime  @default(now())
+  detectedBy      String    // e.g. "python-monitor:gazette-watcher"
+  sourceUrl       String
+  taxType         TaxType?
+  summary         String
+  proposedValue   Json?
+  reviewStatus    String    @default("PENDING") // PENDING | IN_REVIEW | VALIDATED | REJECTED | ACTIVATED
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+
+  resultingVersions TaxRuleVersion[]
+}
+
+// ───────────────────────────── Deadlines & penalties (distinct shape from TaxRule.value) ─────────────────────────────
+
+enum DeadlineBasis {
+  FIXED_DATE
+  DAYS_AFTER_PERIOD_END
+  DAYS_AFTER_EVENT
+  FIXED_DAY_OF_FOLLOWING_MONTH
+  ANNUAL
+  QUARTERLY
+  CUSTOM
+}
+
+model TaxDeadlineRule {
+  id              String        @id @default(cuid())
+  taxType         TaxType
+  jurisdiction    Jurisdiction
+  taxpayerCategoryCode String?  // null = applies to all categories
+  obligationType  String        // "FILING" | "PAYMENT"
+  basis           DeadlineBasis
+  basisValue      Json          // e.g. { "dayOfMonth": 21 } or { "monthsAfterPeriodEnd": 6 }
+  filingExtendsPayment Boolean  @default(false)
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  sourceId        String
+  source          TaxRuleSource @relation(fields: [sourceId], references: [id])
+  sourceReference String
+  status          RuleStatus    @default(DRAFT)
+  createdAt       DateTime      @default(now())
+}
+
+model TaxPenaltyRule {
+  id              String        @id @default(cuid())
+  taxType         TaxType
+  violationType   String        // "LATE_FILING" | "LATE_PAYMENT" | "FAILURE_TO_DEDUCT" | "FAILURE_TO_REMIT" | ...
+  formula         Json          // e.g. { "firstMonthNgn": 100000, "subsequentMonthNgn": 50000 }
+  isEstimateOnly  Boolean       @default(true) // per brief §33 — never present as a final liability unless authority-confirmed
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  sourceId        String
+  source          TaxRuleSource @relation(fields: [sourceId], references: [id])
+  sourceReference String
+  status          RuleStatus    @default(DRAFT)
+  createdAt       DateTime      @default(now())
+}
+
+model TaxInterestRule {
+  id              String        @id @default(cuid())
+  taxType         TaxType
+  referenceRate   String        // e.g. "CBN_MONETARY_POLICY_RATE" or a fixed "0.10"
+  compounding     String?       // "ANNUAL" | "MONTHLY" | null if simple
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  sourceId        String
+  source          TaxRuleSource @relation(fields: [sourceId], references: [id])
+  sourceReference String
+  status          RuleStatus    @default(DRAFT)
+  createdAt       DateTime      @default(now())
+}
+
+model TaxTransitionRule {
+  id              String   @id @default(cuid())
+  description     String
+  fromRegime      String   // e.g. "CITA_2004"
+  toRegime        String   // e.g. "NTA_2025"
+  taxType         TaxType
+  mapping         Json     // how old-regime figures/positions map onto the new regime
+  effectiveDate   DateTime
+  sourceId        String
+  source          TaxRuleSource @relation(fields: [sourceId], references: [id])
+  sourceReference String
+  createdAt       DateTime @default(now())
+}
+
+// ───────────────────────────── State revenue authority directory (brief §22, §32) ─────────────────────────────
+
+enum AuthorityVerificationStatus {
+  FULLY_RESEARCHED
+  WEBSITE_CONFIRMED
+  LOCATED_SECONDARY_SOURCE_UNVERIFIED
+}
+
+// Mirrors research/state_profiles.json. Deliberately NOT a source of tax rates — rates
+// live in TaxRule (jurisdiction=NG_STATE, stateCode=this.stateCode). This table is purely
+// "who administers tax here and how do I reach them", per the brief §22 directory requirement.
+model StateRevenueAuthority {
+  id                  String   @id @default(cuid())
+  stateCode            String  @unique // ISO-ish 2-letter code used throughout, e.g. "EN", "LA", "FC"
+  stateName             String
+  authorityName         String
+  officialWebsite       String?
+  taxpayerPortalUrl     String?
+  taxpayerIdScheme      String?
+  apiAvailable          Boolean? // null = unknown/not yet researched
+  apiDocumentationUrl   String?
+  electronicReceipting  String?
+  approvedPaymentGateways String[] @default([])
+  applicableLaws        String[] @default([])
+  verificationStatus    AuthorityVerificationStatus
+  lastVerified           DateTime?
+  verifiedBy             String?
+  sourceUrls             String[] @default([])
+  createdAt              DateTime @default(now())
+}
+
+// ───────────────────────────── Companies & classification ─────────────────────────────
+
+model Company {
+  id                String   @id @default(cuid())
+  name              String
+  rcNumber          String?  @unique
+  tin               String?  @unique
+  incorporationDate DateTime
+  accountingYearEnd String   // "MM-DD"
+  isResident        Boolean  @default(true)
+  sector            String?
+  isProfessionalServices Boolean @default(false)
+  vatRegistered     Boolean  @default(false)
+  headOfficeStateCode String  // e.g. "EN" — drives the registered-office leg of the jurisdiction matrix, never the WHOLE matrix (brief §2)
+  createdAt         DateTime @default(now())
+
+  classifications   CompanyClassification[]
+  employees         Employee[]
+  branches          Branch[]
+  capitalAssets     CapitalAsset[]
+  taxLossEntries    TaxLossEntry[]
+  taxReturns        TaxReturn[]
+  transactions      BusinessTransaction[]
+  complianceEntries ComplianceCalendarEntry[]
+}
+
+// A company may have zero or many branches, each in its own state, each potentially
+// carrying its own state-level obligations (brief §15, §17). Branch obligations are
+// derived by the jurisdiction engine, never assumed equal to head-office obligations.
+model Branch {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  label            String   // e.g. "Lagos Branch"
+  stateCode        String
+  lgaName          String?
+  address          String?
+  businessActivity String?
+  hasBusinessPremises Boolean @default(true)
+  registeredWithStateAuthority Boolean @default(false)
+  stateTaxpayerId  String?  // e.g. an ESBN-equivalent issued by that state's IRS
+  createdAt        DateTime @default(now())
+
+  employees        Employee[]
+}
+
+// Classification is time-boxed because turnover/assets change year to year and must not
+// be silently re-evaluated against today's numbers when reproducing a historical return.
+model CompanyClassification {
+  id                 String   @id @default(cuid())
+  companyId          String
+  company            Company  @relation(fields: [companyId], references: [id])
+  categoryId         String
+  category           TaxpayerCategory @relation(fields: [categoryId], references: [id])
+  periodStart        DateTime
+  periodEnd          DateTime?
+  turnoverNgn        Decimal? @db.Decimal(18, 2)
+  fixedAssetsNgn     Decimal? @db.Decimal(18, 2)
+  determinedAt       DateTime @default(now())
+  determinationBasis String   // free text explanation, e.g. "turnover <= 50,000,000 and fixed assets <= 250,000,000 per NTA s.56"
+
+  @@index([companyId, periodStart])
+}
+
+model Employee {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  branchId      String?  // which branch they are attached to, if any (null = head office)
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  fullName      String
+  tin           String?
+  stateOfResidenceCode String  // drives PAYE jurisdiction per NTAA — NOT assumed equal to company HQ state (brief §16)
+  stateOfWorkCode      String  // where they actually work; tracked separately from residence
+  isResident    Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  payeCalculations PayeCalculation[]
+}
+
+model PayeCalculation {
+  id                String   @id @default(cuid())
+  employeeId        String
+  employee          Employee @relation(fields: [employeeId], references: [id])
+  periodMonth       Int
+  periodYear        Int
+  grossEmolumentNgn Decimal  @db.Decimal(18, 2)
+  annualRentNgn     Decimal? @db.Decimal(18, 2)
+  reliefAppliedNgn  Decimal  @db.Decimal(18, 2)
+  taxableIncomeNgn  Decimal  @db.Decimal(18, 2)
+  taxPayableNgn     Decimal  @db.Decimal(18, 2)
+  ruleVersionId     String   // frozen reference to the PAYE band rule version used
+  breakdown         Json     // transparent band-by-band breakdown, per brief §24
+  confidence        ConfidenceLevel
+  createdAt         DateTime @default(now())
+
+  @@index([employeeId, periodYear, periodMonth])
+}
+
+// ───────────────────────────── Capital allowance register (separate from accounting depreciation) ─────────────────────────────
+
+model CapitalAsset {
+  id                     String   @id @default(cuid())
+  companyId              String
+  company                Company  @relation(fields: [companyId], references: [id])
+  description            String
+  assetClass             Int      // 1, 2 or 3 per NTA First Schedule Table I
+  qualifyingExpenditureNgn Decimal @db.Decimal(18, 2)
+  acquisitionDate        DateTime
+  disposalDate           DateTime?
+  disposalProceedsNgn    Decimal? @db.Decimal(18, 2)
+  businessUsePercent      Decimal @default(100) @db.Decimal(5, 2)
+  inUseAtPeriodEnd        Boolean @default(true)
+
+  claims                 CapitalAllowanceClaim[]
+}
+
+model CapitalAllowanceClaim {
+  id                String   @id @default(cuid())
+  assetId           String
+  asset             CapitalAsset @relation(fields: [assetId], references: [id])
+  yearOfAssessment  Int
+  openingResidueNgn Decimal  @db.Decimal(18, 2)
+  allowanceClaimedNgn Decimal @db.Decimal(18, 2)
+  notionalResidueNgn  Decimal @db.Decimal(18, 2) // the 1% statistical retention, never affects claimable amount
+  closingResidueNgn Decimal  @db.Decimal(18, 2)
+  ruleVersionId     String   // frozen reference to the capital allowance table version used
+  createdAt         DateTime @default(now())
+
+  @@unique([assetId, yearOfAssessment])
+}
+
+// ───────────────────────────── Tax loss schedule ─────────────────────────────
+
+model TaxLossEntry {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  tradeOrBusiness  String   // ring-fencing key — a loss can only offset the trade that generated it
+  yearIncurred     Int
+  originalLossNgn  Decimal  @db.Decimal(18, 2)
+  remainingLossNgn Decimal  @db.Decimal(18, 2)
+  isDigitalAsset   Boolean  @default(false) // digital/virtual asset losses are ring-fenced separately per NTA s.27(6)
+  createdAt        DateTime @default(now())
+
+  utilisations     TaxLossUtilisation[]
+}
+
+model TaxLossUtilisation {
+  id              String   @id @default(cuid())
+  lossEntryId     String
+  lossEntry       TaxLossEntry @relation(fields: [lossEntryId], references: [id])
+  yearUtilised    Int
+  amountUtilisedNgn Decimal @db.Decimal(18, 2)
+  taxReturnId     String?
+  createdAt       DateTime @default(now())
+}
+
+// ───────────────────────────── Transactions (drive WHT determination) ─────────────────────────────
+
+model BusinessTransaction {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  counterpartyName  String
+  counterpartyTin   String?
+  counterpartyIsCorporate Boolean
+  counterpartyIsResident  Boolean
+  transactionCategory String  // maps to WHT rate table keys, e.g. "commission_consultancy_technical_management_professional_fees"
+  grossAmountNgn    Decimal  @db.Decimal(18, 2)
+  transactionDate   DateTime
+  whtDetermination  WhtDetermination?
+  createdAt         DateTime @default(now())
+}
+
+model WhtDetermination {
+  id                String   @id @default(cuid())
+  transactionId     String   @unique
+  transaction       BusinessTransaction @relation(fields: [transactionId], references: [id])
+  applicable        Boolean
+  rateApplied       Decimal? @db.Decimal(6, 4)
+  whtAmountNgn      Decimal? @db.Decimal(18, 2)
+  netPaymentNgn     Decimal? @db.Decimal(18, 2)
+  exemptionReason   String?
+  ruleVersionId     String?
+  explanation       String   // human-readable "why" per brief §11
+  confidence        ConfidenceLevel
+  createdAt         DateTime @default(now())
+}
+
+// ───────────────────────────── Returns, filings, payments ─────────────────────────────
+
+model TaxReturn {
+  id                   String   @id @default(cuid())
+  companyId            String
+  company              Company  @relation(fields: [companyId], references: [id])
+  taxType              TaxType
+  periodStart          DateTime
+  periodEnd            DateTime
+  taxpayerClassificationSnapshot Json // frozen copy of classification used, not a live FK re-evaluated later
+  calculationVersion   String   // version of the *engine code* that produced this, independent of rule version
+  calculationBreakdown Json     // full transparent calculation per brief §24
+  taxLiabilityNgn      Decimal  @db.Decimal(18, 2)
+  confidence           ConfidenceLevel
+
+  preparedAt           DateTime?
+  approvedAt           DateTime?
+  approvedBy           String?
+  submittedAt          DateTime?
+  submissionReference  String?
+  receiptReference     String?
+
+  status               String   @default("DRAFT") // DRAFT | VALIDATED | APPROVED | FILED | REJECTED | SUPERSEDED
+  rejectionReason      String?
+
+  ruleUsages           TaxReturnRuleUsage[]
+  filingAttempts       FilingAttempt[]
+  payments             Payment[]
+  complianceEntry      ComplianceCalendarEntry?
+
+  createdAt            DateTime @default(now())
+
+  @@index([companyId, taxType, periodStart])
+}
+
+// Join table recording exactly which rule versions were used to compute a return — this is
+// what makes "recalculate with the old rule, not today's rule" possible (brief §25).
+model TaxReturnRuleUsage {
+  id             String   @id @default(cuid())
+  taxReturnId    String
+  taxReturn      TaxReturn @relation(fields: [taxReturnId], references: [id])
+  ruleVersionId  String
+  ruleVersion    TaxRuleVersion @relation(fields: [ruleVersionId], references: [id])
+
+  @@unique([taxReturnId, ruleVersionId])
+}
+
+enum FilingErrorClass {
+  TEMPORARY
+  AUTHENTICATION
+  VALIDATION
+  AUTHORITY_REJECTION
+  NETWORK
+  DUPLICATE
+  UNKNOWN
+}
+
+model FilingAttempt {
+  id             String   @id @default(cuid())
+  taxReturnId    String
+  taxReturn      TaxReturn @relation(fields: [taxReturnId], references: [id])
+  mode           String    // "MANUAL" | "APPROVAL_REQUIRED" | "AUTOMATIC"
+  authorityAdapter String  // which TaxAuthorityAdapter implementation handled this
+  attemptedAt    DateTime  @default(now())
+  succeeded      Boolean
+  errorClass     FilingErrorClass?
+  rawResponse    Json?
+  receiptReference String?
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  taxReturnId    String
+  taxReturn      TaxReturn @relation(fields: [taxReturnId], references: [id])
+  amountNgn      Decimal  @db.Decimal(18, 2)
+  paidAt         DateTime?
+  paymentReference String?
+  status         String   @default("PENDING") // PENDING | CONFIRMED | FAILED
+  createdAt      DateTime @default(now())
+}
+
+// ───────────────────────────── Compliance calendar ─────────────────────────────
+
+model ComplianceCalendarEntry {
+  id                  String   @id @default(cuid())
+  companyId           String
+  company             Company  @relation(fields: [companyId], references: [id])
+  taxReturnId         String?  @unique
+  taxReturn           TaxReturn? @relation(fields: [taxReturnId], references: [id])
+  taxType             TaxType
+  periodLabel         String   // e.g. "September 2026"
+  statutoryDeadline   DateTime
+  internalDeadline    DateTime? // administrator safety margin, per brief §17
+  recommendedFilingDate DateTime?
+  amountNgn           Decimal? @db.Decimal(18, 2)
+  responsiblePerson   String?
+  approvalStatus      String   @default("AWAITING_APPROVAL")
+  paymentStatus        String   @default("UNPAID")
+  filingStatus         String   @default("NOT_FILED")
+  isOverdue             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+
+  @@index([companyId, statutoryDeadline])
+}
