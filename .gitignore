@@ -2,5 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 monitoring/change_log/
+storage/documents/
+*.traineddata
 .env
 .env.local

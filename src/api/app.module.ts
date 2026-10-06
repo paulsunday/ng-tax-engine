@@ -14,6 +14,11 @@ import { InvoicesModule } from "./invoices/invoices.module";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { AssetsModule } from "./assets/assets.module";
 import { TaxRulesModule } from "./tax-rules/tax-rules.module";
+import { StorageModule } from "./storage/storage.module";
+import { BankAccountsModule } from "./bank-accounts/bank-accounts.module";
+import { BankImportModule } from "./bank-import/bank-import.module";
+import { ReconciliationModule } from "./reconciliation/reconciliation.module";
+import { DocumentsModule } from "./documents/documents.module";
 
 @Module({
   imports: [
@@ -32,6 +37,11 @@ import { TaxRulesModule } from "./tax-rules/tax-rules.module";
     ExpensesModule,
     AssetsModule,
     TaxRulesModule,
+    StorageModule,
+    BankAccountsModule,
+    BankImportModule,
+    ReconciliationModule,
+    DocumentsModule,
   ],
 })
 export class AppModule {}

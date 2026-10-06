@@ -417,6 +417,13 @@ model Company {
   expenses          Expense[]
   accountingPayments AccountingPayment[]
   assets            Asset[]
+
+  // Phase 3 — bank import, reconciliation, documents
+  bankAccounts      BankAccount[]
+  bankStatementImports BankStatementImport[]
+  bankTransactions  BankTransaction[]
+  reconciliations   Reconciliation[]
+  documents         Document[]
 }
 
 // A company may have zero or many branches, each in its own state, each potentially
@@ -995,4 +1002,170 @@ model AssetDepreciationEntry {
   createdAt      DateTime @default(now())
 
   @@unique([assetId, periodYear, periodMonth])
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PHASE 3 — Bank import, reconciliation, document management + OCR
+// (master-build-prompt §7-9, §54 Phase 3)
+// ═════════════════════════════════════════════════════════════════════════
+
+model BankAccount {
+  id                String   @id @default(cuid())
+  organizationId    String
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  accountName       String
+  bankName          String
+  accountNumber     String
+  currency          String   @default("NGN")
+  openingBalanceNgn Decimal  @default(0) @db.Decimal(18, 2)
+  glAccountId       String?  // which Account (chart of accounts row) this bank account reconciles against — usually Cash/Bank
+  createdAt         DateTime @default(now())
+
+  statementImports  BankStatementImport[]
+  transactions      BankTransaction[]
+  reconciliations   Reconciliation[]
+
+  @@index([organizationId, companyId])
+}
+
+enum StatementFileFormat {
+  CSV
+  XLSX
+  PDF
+}
+
+enum StatementImportStatus {
+  PENDING_MAPPING // auto-detection failed or was ambiguous — awaiting a manual column map
+  PROCESSED
+  FAILED
+}
+
+model BankStatementImport {
+  id                String                 @id @default(cuid())
+  organizationId    String
+  companyId         String
+  company           Company                @relation(fields: [companyId], references: [id])
+  bankAccountId     String
+  bankAccount       BankAccount            @relation(fields: [bankAccountId], references: [id])
+  fileName          String
+  fileFormat        StatementFileFormat
+  storagePath       String
+  columnMapping     Json?                  // resolved mapping used (or proposed, pending confirmation) — see src/bank-import/columnMapping.ts
+  status            StatementImportStatus  @default(PENDING_MAPPING)
+  importedRowCount  Int                    @default(0)
+  skippedRowCount   Int                    @default(0)
+  errorMessage      String?
+  uploadedBy        String
+  createdAt         DateTime               @default(now())
+
+  transactions      BankTransaction[]
+
+  @@index([organizationId, companyId])
+}
+
+enum BankTransactionMatchStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+model BankTransaction {
+  id                String                     @id @default(cuid())
+  organizationId    String
+  companyId         String
+  company           Company                    @relation(fields: [companyId], references: [id])
+  bankAccountId     String
+  bankAccount       BankAccount                @relation(fields: [bankAccountId], references: [id])
+  importId          String?
+  import            BankStatementImport?       @relation(fields: [importId], references: [id])
+  transactionDate    DateTime
+  narration          String
+  reference          String?
+  debitNgn            Decimal                   @default(0) @db.Decimal(18, 2)
+  creditNgn           Decimal                   @default(0) @db.Decimal(18, 2)
+  balanceAfterNgn      Decimal?                  @db.Decimal(18, 2)
+  dedupeHash           String                    // sha256(bankAccountId + date + debit + credit + narration) — see bank-import module
+  matchStatus          BankTransactionMatchStatus @default(UNMATCHED)
+  matchedEntityType     String?                   // "AccountingPayment" | "JournalEntry" | ...
+  matchedEntityId       String?
+  matchConfidence        String?                  // "EXACT" | "LIKELY" | "MANUAL"
+  reconciliationId        String?
+  reconciliation           Reconciliation?          @relation(fields: [reconciliationId], references: [id])
+  createdAt                DateTime                 @default(now())
+
+  @@index([organizationId, companyId, bankAccountId])
+  @@index([dedupeHash])
+  @@index([matchStatus])
+}
+
+enum ReconciliationStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Reconciliation {
+  id                 String                @id @default(cuid())
+  organizationId      String
+  companyId            String
+  company               Company              @relation(fields: [companyId], references: [id])
+  bankAccountId          String
+  bankAccount            BankAccount          @relation(fields: [bankAccountId], references: [id])
+  periodLabel             String
+  statementEndDate         DateTime
+  statementBalanceNgn       Decimal             @db.Decimal(18, 2)
+  ledgerBalanceNgn           Decimal             @db.Decimal(18, 2) // snapshot at completion/creation time
+  status                     ReconciliationStatus @default(IN_PROGRESS)
+  completedBy                 String?
+  completedAt                  DateTime?
+  createdAt                    DateTime            @default(now())
+
+  transactions                 BankTransaction[]
+
+  @@index([organizationId, companyId, bankAccountId])
+}
+
+enum DocumentCategory {
+  INVOICE
+  RECEIPT
+  CONTRACT
+  BANK_STATEMENT
+  PAYROLL
+  ASSET_PURCHASE
+  TAX
+  PAYMENT_EVIDENCE
+  SUPPLIER
+  CUSTOMER
+  OTHER
+}
+
+enum OcrStatus {
+  NOT_APPLICABLE
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Document {
+  id                String           @id @default(cuid())
+  organizationId    String
+  companyId         String
+  company           Company          @relation(fields: [companyId], references: [id])
+  category          DocumentCategory
+  fileName          String
+  mimeType          String
+  sizeBytes         Int
+  storagePath       String
+  checksumSha256    String
+  linkedEntityType  String?          // e.g. "Invoice", "Expense", "BankTransaction", "Asset"
+  linkedEntityId    String?
+  ocrStatus         OcrStatus        @default(NOT_APPLICABLE)
+  ocrExtractedData  Json?            // structured fields extracted — see src/documents/ocr/
+  ocrConfidence     Json?            // per-field confidence, never a single opaque "99% accurate" claim
+  inconsistencyFlags Json?           // e.g. ["AMOUNT_MISMATCH_WITH_LINKED_TRANSACTION"]
+  uploadedBy        String
+  createdAt         DateTime         @default(now())
+
+  @@index([organizationId, companyId, category])
+  @@index([linkedEntityType, linkedEntityId])
 }
