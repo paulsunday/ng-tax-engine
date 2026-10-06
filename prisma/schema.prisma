@@ -16,6 +16,115 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ───────────────────────────── Multi-tenancy, auth, RBAC, audit log (Phase 1) ─────────────────────────────
+// Design: Organization is the tenant boundary. Every tenant-owned row (Company, and
+// everything hanging off it) carries an organizationId, and every query in the API layer
+// MUST filter by the caller's organizationId — see src/api/common/guards/tenant.guard.ts.
+// There is deliberately no "global company list" endpoint for ordinary users.
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members   OrganizationUser[]
+  companies Company[]
+  auditLogs AuditLog[]
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  fullName        String
+  isPlatformAdmin Boolean  @default(false) // brief §5: Platform Administrator is cross-tenant, everyone else is tenant-scoped
+  mfaEnabled      Boolean  @default(false)
+  mfaSecret       String?  // TOTP secret, never returned by any API response
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  memberships     OrganizationUser[]
+  auditLogs       AuditLog[]
+}
+
+// A system-defined role per brief §5. Custom per-organization roles can be added later by
+// giving Role an optional organizationId; left out of Phase 1 to keep RBAC auditable and
+// simple while the rest of the app is still being built.
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // "PLATFORM_ADMIN" | "COMPANY_OWNER" | "COMPANY_ADMIN" | "ACCOUNTANT" | "AUDITOR" | "TAX_OFFICER" | "FINANCE_MANAGER" | "MANAGEMENT_APPROVER" | "EMPLOYEE" | "READ_ONLY"
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  memberships     OrganizationUser[]
+}
+
+// Permission keys per brief §5 (view/create/edit/delete/approve transactions, import bank
+// statements, reconcile, run audit, create/approve adjustments, calculate taxes, prepare
+// returns, approve/submit filing, view tax history, manage users/settings/tax config, view
+// audit logs, export reports...). Stored as rows, not an enum, so new permissions can be
+// added without a migration touching every role.
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g. "transactions.create", "tax.filing.submit"
+  description String
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+// The actual tenant-scoping join: who belongs to which organization, with what role.
+model OrganizationUser {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User             @relation(fields: [userId], references: [id])
+  roleId         String
+  role           Role             @relation(fields: [roleId], references: [id])
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+// Immutable (brief §29): no update/delete mutation is exposed for this model anywhere in
+// the API layer — only AuditLogService.record() may insert. previousValue/newValue are
+// free-form JSON snapshots so this one table can log any entity type in the system.
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  action         String   // e.g. "CREATE", "UPDATE", "DELETE", "APPROVE", "SUBMIT_FILING"
+  objectType     String   // e.g. "Company", "TaxReturn", "CapitalAsset"
+  objectId       String?
+  previousValue  Json?
+  newValue       Json?
+  ipAddress      String?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, objectType, objectId])
+  @@index([userId])
+}
+
 // ───────────────────────────── Reference / lookup tables ─────────────────────────────
 
 enum TaxType {
@@ -276,6 +385,8 @@ model StateRevenueAuthority {
 
 model Company {
   id                String   @id @default(cuid())
+  organizationId    String   // tenant boundary — every query for this model MUST filter by the caller's org (brief §4)
+  organization      Organization @relation(fields: [organizationId], references: [id])
   name              String
   rcNumber          String?  @unique
   tin               String?  @unique
