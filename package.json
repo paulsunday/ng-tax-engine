@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "description": "Nigeria tax regulatory rules engine for accounting, audit, tax computation and filing",
   "private": true,
-  "main": "dist/index.js",
+  "main": "dist/src/api/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "postinstall": "prisma generate",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed:rbac": "ts-node -r reflect-metadata prisma/seed-rbac.ts",
     "start:api": "ts-node -r reflect-metadata src/api/main.ts",
-    "start:api:dev": "ts-node-dev -r reflect-metadata --respawn src/api/main.ts"
+    "start:api:dev": "ts-node-dev -r reflect-metadata --respawn src/api/main.ts",
+    "start": "prisma migrate deploy && node dist/prisma/seed-rbac.js && node dist/src/api/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",
