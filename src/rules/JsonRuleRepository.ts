@@ -58,7 +58,12 @@ function toRuleRecord(r: SeedFileRule): RuleRecord {
 export class JsonRuleRepository extends BaseRuleRepository {
   private rules: RuleRecord[];
 
-  constructor(filePath: string = path.join(__dirname, "..", "..", "research", "rule_seed_data.json")) {
+  // process.cwd(), not __dirname: __dirname's depth relative to the project root changes
+  // between ts-node (src/rules) and the compiled build (dist/src/rules, one level deeper
+  // because tsconfig's rootDir mirrors the whole source tree) — process.cwd() is the
+  // project root under every way this process is actually launched (npm scripts, the
+  // Railway/Render start command, Jest).
+  constructor(filePath: string = path.join(process.cwd(), "research", "rule_seed_data.json")) {
     super();
     const raw = fs.readFileSync(filePath, "utf-8");
     const parsed: SeedFile = JSON.parse(raw);

@@ -14,7 +14,8 @@ interface StateProfilesFile {
 export class StateAuthorityRepository {
   private profiles: Map<string, StateAuthorityProfile>;
 
-  constructor(filePath: string = path.join(__dirname, "..", "..", "research", "state_profiles.json")) {
+  // process.cwd(), not __dirname — see the same fix/rationale in JsonRuleRepository.ts.
+  constructor(filePath: string = path.join(process.cwd(), "research", "state_profiles.json")) {
     const raw = fs.readFileSync(filePath, "utf-8");
     const parsed: StateProfilesFile = JSON.parse(raw);
     this.profiles = new Map(parsed.states.map((s) => [s.state_code, s]));
