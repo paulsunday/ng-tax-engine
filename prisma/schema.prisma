@@ -428,6 +428,9 @@ model Company {
   // Phases 4-6 — audit engine, scenarios
   auditRuns         AuditRun[]
   scenarios         Scenario[]
+
+  // Phases 7-10 — notifications
+  notifications     Notification[]
 }
 
 // A company may have zero or many branches, each in its own state, each potentially
@@ -1309,4 +1312,44 @@ model ScenarioAdjustment {
   createdAt              DateTime                  @default(now())
 
   @@index([scenarioId])
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PHASES 7-10 — Compliance notifications (master-build-prompt §26-27)
+// In-app only: no email/SMS/WhatsApp provider is wired up (no credentials exist
+// in this environment) — channel is recorded so a real provider can be plugged
+// in later without changing anything that generates the notification content.
+// ═════════════════════════════════════════════════════════════════════════
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Notification {
+  id             String              @id @default(cuid())
+  organizationId String
+  companyId      String?
+  company        Company?            @relation(fields: [companyId], references: [id])
+  userId         String?             // null = broadcast to everyone with access to the company
+  category       String              // "UPCOMING_FILING" | "OVERDUE_FILING" | "MISSING_DOCUMENTS" | ...
+  title          String
+  body           String
+  channel        NotificationChannel @default(IN_APP)
+  status         NotificationStatus  @default(PENDING)
+  relatedEntityType String?
+  relatedEntityId   String?
+  readAt            DateTime?
+  createdAt         DateTime          @default(now())
+
+  @@index([organizationId, userId, readAt])
+  @@index([companyId, category])
 }

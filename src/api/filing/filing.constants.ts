@@ -1,0 +1,1 @@
+export const ADAPTER_REGISTRY = "ADAPTER_REGISTRY";

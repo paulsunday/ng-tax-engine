@@ -22,6 +22,16 @@ import { DocumentsModule } from "./documents/documents.module";
 import { FinancialStatementsModule } from "./financial-statements/financial-statements.module";
 import { AuditModule } from "./audit/audit.module";
 import { ScenariosModule } from "./scenarios/scenarios.module";
+import { CapitalAllowanceModule } from "./capital-allowance/capital-allowance.module";
+import { TaxLossModule } from "./tax-loss/tax-loss.module";
+import { PayrollModule } from "./payroll/payroll.module";
+import { WhtDeterminationModule } from "./wht-determination/wht-determination.module";
+import { TaxCalculationModule } from "./tax-calculation/tax-calculation.module";
+import { TaxReturnsModule } from "./tax-returns/tax-returns.module";
+import { ComplianceCalendarModule } from "./compliance-calendar/compliance-calendar.module";
+import { FilingModule } from "./filing/filing.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -48,6 +58,16 @@ import { ScenariosModule } from "./scenarios/scenarios.module";
     FinancialStatementsModule,
     AuditModule,
     ScenariosModule,
+    CapitalAllowanceModule,
+    TaxLossModule,
+    PayrollModule,
+    WhtDeterminationModule,
+    TaxCalculationModule,
+    TaxReturnsModule,
+    ComplianceCalendarModule,
+    FilingModule,
+    PaymentsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
