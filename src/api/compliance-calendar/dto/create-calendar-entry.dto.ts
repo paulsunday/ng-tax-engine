@@ -10,5 +10,5 @@ export class CreateCalendarEntryDto {
 
   @IsOptional()
   @IsString()
-  responsiblePerson?: string;
+  responsibleUserId?: string;
 }

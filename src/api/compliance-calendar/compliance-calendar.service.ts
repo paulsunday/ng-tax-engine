@@ -38,7 +38,7 @@ export class ComplianceCalendarService {
    * statutory 21st -> internal 19th -> recommended filing 18th) — never assumed to be a
    * fixed "2 days before the 21st" in code.
    */
-  async createForReturn(organizationId: string, companyId: string, userId: string, taxReturnId: string, internalSafetyMarginDays: number, responsiblePerson?: string) {
+  async createForReturn(organizationId: string, companyId: string, userId: string, taxReturnId: string, internalSafetyMarginDays: number, responsibleUserId?: string) {
     await this.companies.getOneOrThrow(organizationId, companyId);
     const taxReturn = await this.prisma.taxReturn.findUnique({ where: { id: taxReturnId } });
     if (!taxReturn || taxReturn.companyId !== companyId) throw new NotFoundException("Tax return not found.");
@@ -51,6 +51,7 @@ export class ComplianceCalendarService {
     const asOfDate = taxReturn.periodEnd.toISOString().slice(0, 10);
     let statutoryDeadline: string;
     let explanation: string;
+    let ruleVersionId: string | undefined;
     try {
       const deadlineResult = computeStatutoryDeadline(
         { taxType: taxReturn.taxType, ruleKey: mapping.ruleKey, jurisdiction: mapping.jurisdiction, periodEnd: taxReturn.periodEnd.toISOString().slice(0, 10), pathSelector: mapping.pathSelector as any },
@@ -59,6 +60,7 @@ export class ComplianceCalendarService {
       );
       statutoryDeadline = deadlineResult.statutoryDeadline;
       explanation = deadlineResult.explanation;
+      ruleVersionId = deadlineResult.ruleIdsUsed[0];
     } catch (err) {
       if (err instanceof UnverifiedRuleError || err instanceof NoApplicableRuleError) {
         throw new BadRequestException(`Cannot compute the statutory deadline: ${err.message}`);
@@ -82,12 +84,14 @@ export class ComplianceCalendarService {
         companyId,
         taxReturnId,
         taxType: taxReturn.taxType,
+        jurisdiction: mapping.jurisdiction,
+        ruleVersionId,
         periodLabel: calendarResult.periodLabel,
         statutoryDeadline: new Date(calendarResult.statutoryDeadline),
         internalDeadline: new Date(calendarResult.internalDeadline),
         recommendedFilingDate: new Date(calendarResult.recommendedFilingDate),
         amountNgn: calendarResult.amountNgn,
-        responsiblePerson,
+        responsibleUserId,
         isOverdue: calendarResult.isOverdue,
       },
     });
@@ -106,7 +110,14 @@ export class ComplianceCalendarService {
 
   async listForCompany(organizationId: string, companyId: string) {
     await this.companies.getOneOrThrow(organizationId, companyId);
-    return this.prisma.complianceCalendarEntry.findMany({ where: { companyId }, orderBy: { statutoryDeadline: "asc" } });
+    const entries = await this.prisma.complianceCalendarEntry.findMany({ where: { companyId }, orderBy: { statutoryDeadline: "asc" } });
+    const now = Date.now();
+    // daysRemaining is derived at read time, never stored — "today" changes every day, so a
+    // stored value would go stale between scheduled refreshes (mandate §7).
+    return entries.map((entry) => ({
+      ...entry,
+      daysRemaining: Math.ceil((entry.statutoryDeadline.getTime() - now) / (1000 * 60 * 60 * 24)),
+    }));
   }
 
   /** Recomputes isOverdue/daysRemaining for every open entry — meant to be run on a schedule (brief §50). */

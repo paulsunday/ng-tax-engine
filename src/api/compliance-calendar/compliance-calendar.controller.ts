@@ -23,7 +23,7 @@ export class ComplianceCalendarController {
   @RequirePermissions(PERMISSIONS.PREPARE_RETURNS)
   create(@CurrentUser() user: JwtPayload, @Param("companyId") companyId: string, @Body() dto: CreateCalendarEntryDto) {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");
-    return this.calendar.createForReturn(user.organizationId, companyId, user.sub, dto.taxReturnId, dto.internalSafetyMarginDays, dto.responsiblePerson);
+    return this.calendar.createForReturn(user.organizationId, companyId, user.sub, dto.taxReturnId, dto.internalSafetyMarginDays, dto.responsibleUserId);
   }
 
   @Post("refresh-overdue")

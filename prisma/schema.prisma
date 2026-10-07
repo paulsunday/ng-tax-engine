@@ -55,6 +55,7 @@ model User {
   taxRuleApprovals        TaxRuleApproval[]
   taxRuleChangeHistory    TaxRuleChangeHistory[]
   taxRuleActivationEvents TaxRuleActivationEvent[]
+  responsibleForCalendarEntries ComplianceCalendarEntry[]
 }
 
 // A system-defined role per brief §5. Custom per-organization roles can be added later by
@@ -269,6 +270,7 @@ model TaxRuleVersion {
   updatedAt        DateTime    @updatedAt
 
   taxReturnUsages  TaxReturnRuleUsage[]
+  calendarEntries  ComplianceCalendarEntry[]
   reviews          TaxRuleReview[]
   approvals        TaxRuleApproval[]
   changeHistory    TaxRuleChangeHistory[]
@@ -811,12 +813,18 @@ model ComplianceCalendarEntry {
   taxReturnId         String?  @unique
   taxReturn           TaxReturn? @relation(fields: [taxReturnId], references: [id])
   taxType             TaxType
+  jurisdiction        String?  // e.g. "NG-FEDERAL" | "NG-STATE" — the jurisdiction the deadline rule was resolved against
   periodLabel         String   // e.g. "September 2026"
   statutoryDeadline   DateTime
   internalDeadline    DateTime? // administrator safety margin, per brief §17
   recommendedFilingDate DateTime?
   amountNgn           Decimal? @db.Decimal(18, 2)
-  responsiblePerson   String?
+  // Frozen reference to exactly which TaxRuleVersion governed this statutory deadline —
+  // same reproducibility principle as TaxReturnRuleUsage (mandate §7/§26).
+  ruleVersionId       String?
+  ruleVersion         TaxRuleVersion? @relation(fields: [ruleVersionId], references: [id])
+  responsibleUserId   String?
+  responsibleUser     User?    @relation(fields: [responsibleUserId], references: [id])
   approvalStatus      String   @default("AWAITING_APPROVAL")
   paymentStatus        String   @default("UNPAID")
   filingStatus         String   @default("NOT_FILED")
