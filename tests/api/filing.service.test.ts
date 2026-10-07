@@ -20,7 +20,7 @@ function makeMocks() {
 }
 
 function approvedReturn(overrides: Partial<any> = {}) {
-  return { id: "ret-1", companyId: "company-1", taxType: "VAT", status: "APPROVED", submittedAt: null, taxLiabilityNgn: "50000", periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-06-30"), calculationBreakdown: {}, ...overrides };
+  return { id: "ret-1", companyId: "company-1", taxType: "VAT", status: "APPROVED", submittedAt: null, taxLiabilityNgn: "50000", complianceState: "CALCULATED", periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-06-30"), calculationBreakdown: {}, ...overrides };
 }
 
 describe("FilingService.submit", () => {

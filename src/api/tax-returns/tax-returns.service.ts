@@ -44,8 +44,11 @@ export class TaxReturnsService {
     if (taxReturn.confidence === "MISSING_REGULATORY_INFORMATION" || taxReturn.confidence === "REQUIRES_REVIEW") {
       errors.push(`Calculation confidence is "${taxReturn.confidence}" — the governing tax rule has not been professionally approved yet. Cannot file on an unverified calculation.`);
     }
+    if (taxReturn.complianceState !== "CALCULATED" || taxReturn.taxLiabilityNgn === null) {
+      errors.push(`Compliance state is "${taxReturn.complianceState}" — there is no calculated liability to validate. Cannot file on an incomplete calculation.`);
+    }
     if (taxReturn.status !== "DRAFT") errors.push(`Return status is "${taxReturn.status}" — only a DRAFT return can be (re-)validated.`);
-    if (Number(taxReturn.taxLiabilityNgn) < 0) errors.push("Tax liability cannot be negative.");
+    if (taxReturn.taxLiabilityNgn !== null && Number(taxReturn.taxLiabilityNgn) < 0) errors.push("Tax liability cannot be negative.");
 
     const valid = errors.length === 0;
     if (valid) {

@@ -1,9 +1,10 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CompaniesService } from "../companies/companies.service";
 import { RULE_REPOSITORY } from "../tax-rules/tax-rules.constants";
 import { RuleRepository } from "../../rules/RuleRepository";
 import { determineWht, RecipientCategory } from "../../engine/wht";
+import { UnverifiedRuleError, NoApplicableRuleError } from "../../types/common";
 
 export interface RecordTransactionInput {
   counterpartyName: string;
@@ -41,18 +42,26 @@ export class WhtDeterminationService {
 
     const recipientCategory: RecipientCategory = `${input.counterpartyIsResident ? "resident" : "nonresident"}_${input.counterpartyIsCorporate ? "corporate" : "noncorporate"}` as RecipientCategory;
 
-    const result = determineWht(
-      {
-        transactionCategory: input.transactionCategory,
-        grossAmountNgn: input.grossAmountNgn,
-        cumulativeMonthlyValueWithSameSupplierNgn,
-        recipientCategory,
-        recipientHasValidTin: !!input.counterpartyTin,
-        supplierIsSmallCompany,
-      },
-      this.rules,
-      asOfDate.toISOString().slice(0, 10)
-    );
+    let result: ReturnType<typeof determineWht>;
+    try {
+      result = determineWht(
+        {
+          transactionCategory: input.transactionCategory,
+          grossAmountNgn: input.grossAmountNgn,
+          cumulativeMonthlyValueWithSameSupplierNgn,
+          recipientCategory,
+          recipientHasValidTin: !!input.counterpartyTin,
+          supplierIsSmallCompany,
+        },
+        this.rules,
+        asOfDate.toISOString().slice(0, 10)
+      );
+    } catch (err) {
+      if (err instanceof UnverifiedRuleError || err instanceof NoApplicableRuleError) {
+        throw new BadRequestException(`Cannot determine WHT for this transaction: ${err.message}`);
+      }
+      throw err;
+    }
 
     const transaction = await this.prisma.businessTransaction.create({
       data: {

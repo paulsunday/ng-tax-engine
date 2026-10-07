@@ -107,7 +107,13 @@ export class AiToolsService {
 
       case "explain_tax_calculation": {
         const taxReturn = await this.taxReturns.getOneOrThrow(organizationId, companyId, p.taxReturnId);
-        return { taxType: taxReturn.taxType, taxLiabilityNgn: taxReturn.taxLiabilityNgn, confidence: taxReturn.confidence, breakdown: taxReturn.calculationBreakdown };
+        return {
+          taxType: taxReturn.taxType,
+          taxLiabilityNgn: taxReturn.taxLiabilityNgn,
+          complianceState: taxReturn.complianceState,
+          confidence: taxReturn.confidence,
+          breakdown: taxReturn.calculationBreakdown,
+        };
       }
 
       case "calculate_tax":

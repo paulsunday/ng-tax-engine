@@ -708,6 +708,17 @@ model WhtDetermination {
 
 // ───────────────────────────── Returns, filings, payments ─────────────────────────────
 
+// Distinguishes WHY a calculation attempt looks the way it does (production-readiness
+// mandate §2) — orthogonal to both `status` (the approve/file workflow state) and
+// `confidence` (the statutory confidence level of a completed calculation).
+enum TaxReturnComplianceState {
+  CALCULATED                    // a real number was produced — may legitimately be zero
+  PENDING_RULE_APPROVAL         // a candidate rule exists but is not yet APPROVED/ACTIVE
+  MISSING_REGULATORY_INFORMATION // no rule object exists at all for this period
+  MISSING_TAXPAYER_INFORMATION  // the taxpayer's own required data (e.g. TIN) is absent
+  CALCULATION_ERROR             // an unexpected failure during computation — never silently swallowed
+}
+
 model TaxReturn {
   id                   String   @id @default(cuid())
   companyId            String
@@ -718,7 +729,11 @@ model TaxReturn {
   taxpayerClassificationSnapshot Json // frozen copy of classification used, not a live FK re-evaluated later
   calculationVersion   String   // version of the *engine code* that produced this, independent of rule version
   calculationBreakdown Json     // full transparent calculation per brief §24
-  taxLiabilityNgn      Decimal  @db.Decimal(18, 2)
+  // Null whenever complianceState is not CALCULATED — never a misleading literal 0 standing
+  // in for "we don't actually know" (mandate §2: "Do not return zero liability as though
+  // the taxpayer owes zero").
+  taxLiabilityNgn      Decimal? @db.Decimal(18, 2)
+  complianceState      TaxReturnComplianceState @default(CALCULATED)
   confidence           ConfidenceLevel
 
   preparedAt           DateTime?

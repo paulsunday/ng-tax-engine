@@ -71,7 +71,9 @@ export class ComplianceCalendarService {
       periodLabel: `${taxReturn.periodStart.toISOString().slice(0, 10)} to ${taxReturn.periodEnd.toISOString().slice(0, 10)}`,
       statutoryDeadline,
       internalSafetyMarginDays,
-      amountNgn: Number(taxReturn.taxLiabilityNgn),
+      // Never coerce a null (not-yet-CALCULATED) liability into a literal 0 — that would
+      // claim "nothing owed" when the true state is "not calculated yet" (mandate §2).
+      amountNgn: taxReturn.complianceState === "CALCULATED" && taxReturn.taxLiabilityNgn !== null ? Number(taxReturn.taxLiabilityNgn) : undefined,
       asOfDate: new Date().toISOString().slice(0, 10),
     });
 

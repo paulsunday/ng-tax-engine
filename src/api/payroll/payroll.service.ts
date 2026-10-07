@@ -1,9 +1,10 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CompaniesService } from "../companies/companies.service";
 import { RULE_REPOSITORY } from "../tax-rules/tax-rules.constants";
 import { RuleRepository } from "../../rules/RuleRepository";
 import { computePaye } from "../../engine/paye";
+import { UnverifiedRuleError, NoApplicableRuleError } from "../../types/common";
 
 export interface CreateEmployeeInput {
   fullName: string;
@@ -62,17 +63,27 @@ export class PayrollService {
     const employee = await this.prisma.employee.findUnique({ where: { id: employeeId } });
     if (!employee || employee.companyId !== companyId) throw new NotFoundException("Employee not found.");
 
-    const result = computePaye(
-      {
-        employeeId: employee.id,
-        stateOfResidence: employee.stateOfResidenceCode,
-        annualGrossEmolumentNgn: input.grossEmolumentNgn,
-        annualRentPaidNgn: input.annualRentNgn ?? 0,
-        isMinimumWageEarner: input.isMinimumWageEarner ?? false,
-      },
-      this.rules,
-      asOfDate.toISOString().slice(0, 10)
-    );
+    let result: ReturnType<typeof computePaye>;
+    try {
+      result = computePaye(
+        {
+          employeeId: employee.id,
+          stateOfResidence: employee.stateOfResidenceCode,
+          annualGrossEmolumentNgn: input.grossEmolumentNgn,
+          annualRentPaidNgn: input.annualRentNgn ?? 0,
+          isMinimumWageEarner: input.isMinimumWageEarner ?? false,
+        },
+        this.rules,
+        asOfDate.toISOString().slice(0, 10)
+      );
+    } catch (err) {
+      // Never let an unapproved/missing rule surface as an opaque 500 — a clear, caught
+      // compliance message instead (mandate §2).
+      if (err instanceof UnverifiedRuleError || err instanceof NoApplicableRuleError) {
+        throw new BadRequestException(`Cannot compute PAYE for this employee: ${err.message}`);
+      }
+      throw err;
+    }
 
     const calculation = await this.prisma.payeCalculation.create({
       data: {

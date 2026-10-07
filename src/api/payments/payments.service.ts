@@ -40,14 +40,25 @@ export class PaymentsService {
     return updated;
   }
 
-  async getOutstandingBalance(organizationId: string, companyId: string, taxReturnId: string): Promise<{ taxLiabilityNgn: number; confirmedPaidNgn: number; outstandingNgn: number }> {
+  async getOutstandingBalance(
+    organizationId: string,
+    companyId: string,
+    taxReturnId: string
+  ): Promise<{ taxLiabilityNgn: number | null; confirmedPaidNgn: number; outstandingNgn: number | null; complianceState: string }> {
     await this.companies.getOneOrThrow(organizationId, companyId);
     const taxReturn = await this.prisma.taxReturn.findUnique({ where: { id: taxReturnId }, include: { payments: true } });
     if (!taxReturn || taxReturn.companyId !== companyId) throw new NotFoundException("Tax return not found.");
 
     const confirmedPaidNgn = taxReturn.payments.filter((p) => p.status === "CONFIRMED").reduce((acc, p) => acc + Number(p.amountNgn), 0);
+    // Never fabricate an outstanding balance against a liability we don't actually have —
+    // Number(null) would silently become 0, implying "nothing owed," which is a materially
+    // different (and false) claim from "we haven't calculated this yet" (mandate §2).
+    if (taxReturn.complianceState !== "CALCULATED" || taxReturn.taxLiabilityNgn === null) {
+      return { taxLiabilityNgn: null, confirmedPaidNgn, outstandingNgn: null, complianceState: taxReturn.complianceState };
+    }
+
     const taxLiabilityNgn = Number(taxReturn.taxLiabilityNgn);
-    return { taxLiabilityNgn, confirmedPaidNgn, outstandingNgn: round2(taxLiabilityNgn - confirmedPaidNgn) };
+    return { taxLiabilityNgn, confirmedPaidNgn, outstandingNgn: round2(taxLiabilityNgn - confirmedPaidNgn), complianceState: taxReturn.complianceState };
   }
 }
 

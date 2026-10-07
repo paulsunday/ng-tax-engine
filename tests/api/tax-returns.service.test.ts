@@ -17,6 +17,7 @@ function baseReturn(overrides: Partial<any> = {}) {
     companyId: "company-1",
     status: "DRAFT",
     confidence: "VERIFIED_CALCULATION",
+    complianceState: "CALCULATED",
     taxLiabilityNgn: "100000",
     periodStart: new Date("2026-06-01"),
     periodEnd: new Date("2026-06-30"),
@@ -49,6 +50,19 @@ describe("TaxReturnsService.validate", () => {
 
     const result = await service.validate("org-1", "company-1", "user-1", "ret-1");
     expect(result.valid).toBe(false);
+  });
+
+  test("fails validation when complianceState is not CALCULATED, even if confidence looks fine — there is no real number to file", async () => {
+    const { prisma, companies, auditLog } = makeMocks();
+    prisma.taxReturn.findUnique.mockResolvedValue(baseReturn({ complianceState: "PENDING_RULE_APPROVAL", taxLiabilityNgn: null }));
+    prisma.company.findUniqueOrThrow.mockResolvedValue({ tin: "TIN-1" });
+    const service = new TaxReturnsService(prisma, companies, auditLog);
+
+    const result = await service.validate("org-1", "company-1", "user-1", "ret-1");
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("PENDING_RULE_APPROVAL"))).toBe(true);
+    expect(prisma.taxReturn.update).not.toHaveBeenCalled();
   });
 
   test("passes validation and flips status to VALIDATED when everything checks out", async () => {

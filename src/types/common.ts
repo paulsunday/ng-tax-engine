@@ -123,3 +123,16 @@ export class NoApplicableRuleError extends Error {
     this.name = "NoApplicableRuleError";
   }
 }
+
+/**
+ * Thrown when a calculation cannot proceed because a required piece of the TAXPAYER's own
+ * data is absent — distinct from UnverifiedRuleError/NoApplicableRuleError, which are about
+ * the statutory rule, not the taxpayer (production-readiness mandate §2: "calculation
+ * unavailable because required taxpayer information is missing" must be its own state).
+ */
+export class MissingTaxpayerInformationError extends Error {
+  constructor(missingField: string) {
+    super(`Cannot complete this calculation — required taxpayer information is missing: ${missingField}.`);
+    this.name = "MissingTaxpayerInformationError";
+  }
+}

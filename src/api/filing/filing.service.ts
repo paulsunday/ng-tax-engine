@@ -42,6 +42,13 @@ export class FilingService {
     if (!company.tin) {
       throw new BadRequestException("Company has no TIN — cannot submit to any tax authority.");
     }
+    // Defense in depth: validate()/approve() already gate on this, but never trust an
+    // earlier check alone (mandate §2 — never file a return with no actual computed number).
+    if (taxReturn.complianceState !== "CALCULATED" || taxReturn.taxLiabilityNgn === null) {
+      throw new BadRequestException(
+        `Cannot submit a return whose compliance state is "${taxReturn.complianceState}" — there is no calculated liability to file.`
+      );
+    }
 
     const authorityKey = taxReturn.taxType === "PAYE" ? company.headOfficeStateCode : "FEDERAL";
     const adapter = this.adapters.get(authorityKey);

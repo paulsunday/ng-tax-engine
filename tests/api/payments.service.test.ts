@@ -17,6 +17,7 @@ describe("PaymentsService.getOutstandingBalance", () => {
       id: "ret-1",
       companyId: "company-1",
       taxLiabilityNgn: "100000",
+      complianceState: "CALCULATED",
       payments: [
         { status: "CONFIRMED", amountNgn: "40000" },
         { status: "PENDING", amountNgn: "30000" }, // not yet confirmed — must not reduce outstanding
@@ -27,6 +28,24 @@ describe("PaymentsService.getOutstandingBalance", () => {
     const result = await service.getOutstandingBalance("org-1", "company-1", "ret-1");
     expect(result.confirmedPaidNgn).toBe(40_000);
     expect(result.outstandingNgn).toBe(60_000);
+  });
+
+  test("reports a null balance, not a fabricated zero-outstanding one, when the return was never actually CALCULATED", async () => {
+    const { prisma, companies, auditLog } = makeMocks();
+    prisma.taxReturn.findUnique.mockResolvedValue({
+      id: "ret-1",
+      companyId: "company-1",
+      taxLiabilityNgn: null,
+      complianceState: "PENDING_RULE_APPROVAL",
+      payments: [],
+    });
+    const service = new PaymentsService(prisma, companies, auditLog);
+
+    const result = await service.getOutstandingBalance("org-1", "company-1", "ret-1");
+
+    expect(result.taxLiabilityNgn).toBeNull();
+    expect(result.outstandingNgn).toBeNull();
+    expect(result.complianceState).toBe("PENDING_RULE_APPROVAL");
   });
 });
 
