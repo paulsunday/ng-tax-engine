@@ -148,6 +148,22 @@ async function main() {
     },
   });
 
+  // Required for ExpensesService.post() to build a balanced journal entry — without at
+  // least one ExpenseItem, only the VAT-recoverable line exists, leaving the entry
+  // unbalanced against the full total (caught live via browser testing, not assumed).
+  const officeSuppliesAccount = await prisma.account.findUniqueOrThrow({ where: { companyId_code: { companyId: company.id, code: "6500" } } });
+  await prisma.expenseItem.upsert({
+    where: { id: "synthetic-expense-item-1" },
+    update: {},
+    create: {
+      id: "synthetic-expense-item-1",
+      expenseId: "synthetic-expense-1",
+      accountId: officeSuppliesAccount.id,
+      description: "Synthetic office supplies (demo data)",
+      amountNgn: 80_000,
+    },
+  });
+
   await prisma.asset.upsert({
     where: { id: "synthetic-asset-1" },
     update: {},
