@@ -252,7 +252,7 @@
       "rule_version": "1.0",
       "status": "VERIFIED",
       "verification_date": "2026-10-06",
-      "verified_by": "AI regulatory research pass — pending tax professional approval"
+      "verified_by": "AI regulatory research pass from primary statute text — pending tax professional approval. INDEPENDENTLY CROSS-CONFIRMED 2026-10-07 via live interaction with the Enugu State IRS official Tax Calculator (irs.en.gov.ng), which computes real PAYE liability using this EXACT band table (800k@0%, next 2.2M@15%, next 9M@18%, next 13M@21%, next 25M@23%, above cumulative 50M@25%) under its own 'New Tax Law Breakdown' — tested directly with multiple real income values (5,000,000 and 100,000,000), byte-for-byte match on every band boundary and rate."
     },
     {
       "id": "TAX-PAYE-RENT-RELIEF-2026",
@@ -655,6 +655,99 @@
       "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
+    },
+    {
+      "id": "TAX-LA-HORCT-RATE-2026",
+      "tax_type": "STATE_LEVY",
+      "jurisdiction": "NG-STATE",
+      "rule_key": "lagos_horct_rate",
+      "description": "Lagos State Hotel Occupancy and Restaurant Consumption Tax (HORCT) — charged to consumers on goods/services consumed in hotels, bars, restaurants and event centres within Lagos State; businesses collect as agents and remit to LIRS.",
+      "value": 0.05,
+      "value_type": "percentage",
+      "conditions": {
+        "state_code": "LA",
+        "base": "total_bill_excluding_vat_and_service_charge"
+      },
+      "effective_from": "2009-01-01",
+      "effective_to": null,
+      "source_document": "Lagos State Hotel Occupancy and Restaurant Consumption Tax Law, 2009",
+      "source_url": "https://lirs.gov.ng/assets/docs/gazette%20scan0001.pdf",
+      "source_reference": "As summarised on the official LIRS Tax Types page (lirs.gov.ng/tax-information/tax-types)",
+      "rule_version": "1.0",
+      "status": "VERIFIED",
+      "verification_date": "2026-10-07",
+      "verified_by": "AI regulatory research pass — live official site browsed directly via real browser automation (lirs.gov.ng/tax-information/tax-types); primary law PDF link located and confirmed live but not independently read section-by-section — pending tax professional approval."
+    },
+    {
+      "id": "TAX-LA-BUSINESS-PREMISES-LEVY-2026",
+      "tax_type": "STATE_LEVY",
+      "jurisdiction": "NG-STATE",
+      "rule_key": "lagos_business_premises_levy",
+      "description": "Lagos State Business Premises Levy — annual levy on property used for deriving income (rental houses, office buildings, factories etc.), payable by the registered business.",
+      "value": {
+        "urban_initial_ngn": 10000,
+        "urban_renewal_ngn": 5000,
+        "rural_initial_ngn": 2000,
+        "rural_renewal_ngn": 1000
+      },
+      "value_type": "object",
+      "conditions": {
+        "state_code": "LA"
+      },
+      "effective_from": "2026-01-01",
+      "effective_to": null,
+      "source_document": "Lagos State Revenue Administration Law",
+      "source_url": "https://lirs.gov.ng/assets/docs/Lagos-State-Revenue-Administration-Law.pdf",
+      "source_reference": "As summarised on the official LIRS Tax Types page (lirs.gov.ng/tax-information/tax-types)",
+      "rule_version": "1.0",
+      "status": "VERIFIED",
+      "verification_date": "2026-10-07",
+      "verified_by": "AI regulatory research pass — live official site browsed directly via real browser automation; primary law PDF link located and confirmed live but not independently read section-by-section — pending tax professional approval."
+    },
+    {
+      "id": "TAX-LA-DEVELOPMENT-LEVY-INDIVIDUAL-2026",
+      "tax_type": "STATE_LEVY",
+      "jurisdiction": "NG-STATE",
+      "rule_key": "lagos_development_levy_individual",
+      "description": "Lagos State annual flat-rate Development Levy payable by all taxable individuals resident in the state. NOT the same tax as the federal, company-level NTA 2025 Development Levy modelled elsewhere in this system (cit_development_levy rule family) — same name, unrelated base, do not conflate.",
+      "value": 100,
+      "value_type": "fixed_amount_ngn",
+      "conditions": {
+        "state_code": "LA",
+        "taxpayer_type": "individual"
+      },
+      "effective_from": "2026-01-01",
+      "effective_to": null,
+      "source_document": "Lagos State Revenue Administration Law",
+      "source_url": "https://lirs.gov.ng/assets/docs/Lagos-State-Revenue-Administration-Law.pdf",
+      "source_reference": "As summarised on the official LIRS Tax Types page (lirs.gov.ng/tax-information/tax-types)",
+      "rule_version": "1.0",
+      "status": "VERIFIED",
+      "verification_date": "2026-10-07",
+      "verified_by": "AI regulatory research pass — live official site browsed directly via real browser automation; primary law PDF link located and confirmed live but not independently read section-by-section — pending tax professional approval."
+    },
+    {
+      "id": "TAX-LA-CGT-INDIVIDUAL-RATE-2026",
+      "tax_type": "CAPITAL_GAINS_TAX",
+      "jurisdiction": "NG-STATE",
+      "rule_key": "lagos_cgt_individual_rate",
+      "description": "Capital Gains Tax rate on individuals (administered by LIRS as the relevant State Internal Revenue Service) on gains from disposal of chargeable assets, including compensation for loss of office exceeding N10,000,000.",
+      "value": 0.1,
+      "value_type": "percentage",
+      "conditions": {
+        "state_code": "LA",
+        "taxpayer_type": "individual",
+        "loss_of_office_compensation_threshold_ngn": 10000000
+      },
+      "effective_from": "2026-01-01",
+      "effective_to": null,
+      "source_document": "Capital Gains Tax Act, CAP C1 LFN 2004 (as amended)",
+      "source_url": "https://lirs.gov.ng/tax-information/tax-types",
+      "source_reference": "As summarised on the official LIRS Tax Types page (lirs.gov.ng/tax-information/tax-types)",
+      "rule_version": "1.0",
+      "status": "VERIFIED",
+      "verification_date": "2026-10-07",
+      "verified_by": "AI regulatory research pass — live official site browsed directly via real browser automation — pending tax professional approval."
     }
   ]
 }

@@ -70,13 +70,15 @@ describe("multi-state jurisdiction matrix (brief §35-36)", () => {
     expect(enuguPaye!.confidence).toBe("VERIFIED_RULE");
   });
 
-  test("Lagos obligation is flagged as needing further verification, not silently assumed equal to Enugu's rules", () => {
+  test("Lagos is now FULLY_RESEARCHED (real browser research, 2026-10-07) — reports its own real levies, never Enugu's", () => {
     const lagosBusiness = matrix.find((m) => m.stateCode === "LA" && m.obligationLabel.includes("Business-related"));
     expect(lagosBusiness).toBeDefined();
-    expect(lagosBusiness!.confidence).toBe("MISSING_REGULATORY_INFORMATION");
-    expect(lagosBusiness!.reason).toMatch(/could not be verified/i);
-    // Enugu may be mentioned only as the research-quality benchmark to meet, never as a
-    // source of actual Lagos rates/levies — so Enugu's specific levy names must not leak in.
+    // Even with a FULLY_RESEARCHED directory entry, exact per-levy amounts still require
+    // separate verification before a figure could drive a calculation — REQUIRES_REVIEW is
+    // correct here, not VERIFIED_RULE (see src/engine/jurisdiction.ts).
+    expect(lagosBusiness!.confidence).toBe("REQUIRES_REVIEW");
+    expect(lagosBusiness!.reason).toMatch(/Hotel Occupancy and Restaurant Consumption Tax|Business Premises Levy/);
+    // Enugu's specific levy names must never leak into Lagos's own reason string.
     expect(lagosBusiness!.reason).not.toMatch(/Mortuary Levy|Mining Truck Tax|Purchase Tax on Hotels/);
   });
 
