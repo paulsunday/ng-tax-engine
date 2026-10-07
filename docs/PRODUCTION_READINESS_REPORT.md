@@ -1,21 +1,24 @@
 # Production Readiness Report
 
-**Date:** 2026-10-07
+**Date:** 2026-10-07 (updated same day — frontend Stage 1 MVP added)
 **Scope:** Response to the production-readiness mandate issued this build cycle. Every
 status below was checked against the actual code, the actual test run, or the actual live
-production deployment (`https://api-production-2b6a.up.railway.app`, Railway project
+production deployment (`https://api-production-2b6a.up.railway.app` backend,
+`https://frontend-production-e6cf.up.railway.app` frontend, Railway project
 `ng-tax-engine`) during this session — nothing here is asserted without a file path, test
 count, or command output backing it.
 
 **Headline verdict: NOT YET FULLY PRODUCTION READY.** Most backend sections are genuinely
-done and verified. Three things explicitly block a clean bill of health: (1) **no statutory
-tax rule has been approved by a qualified tax professional**, so every real tax calculation
-today correctly returns `PENDING_RULE_APPROVAL` rather than a number — this is a deliberate
-gate, not a bug, but it means the system cannot yet be used to file a real return; (2) **no
-frontend exists** — every capability below has only been verified via API/CLI; (3) the
-**NDPR/NDPA gap analysis found a live, unresolved data-residency exposure** (production
-hosted in a US region) plus several unbuilt data-subject-rights features. None of this was
-hidden in earlier updates — see `docs/NDPR_GAP_ANALYSIS.md` and this report's section 18/27.
+done and verified, and a Stage 1 frontend is now live and verified end-to-end in a real
+browser against production. Two things explicitly block a clean bill of health: (1) **no
+statutory tax rule has been approved by a qualified tax professional**, so every real tax
+calculation today correctly returns `PENDING_RULE_APPROVAL` rather than a number — this is a
+deliberate gate, not a bug, but it means the system cannot yet be used to file a real return;
+(2) the **NDPR/NDPA gap analysis found a live, unresolved data-residency exposure**
+(production hosted in a US region) plus several unbuilt data-subject-rights features. None
+of this was hidden in earlier updates — see `docs/NDPR_GAP_ANALYSIS.md` and this report's
+section 18/27. The frontend itself is Stage 1 only — invoicing/expenses/documents/
+scenarios/payroll UI are explicitly not built yet (see section 8-9).
 
 ---
 
@@ -60,9 +63,16 @@ genuinely conflicted/unresolved — computing it correctly throws rather than gu
 
 ## 8-9. Frontend, org switching
 
-**S9 (frontend): NOT STARTED, by explicit user instruction** — deferred to last, now that
-every backend section is done. Every verification in this report and in this build is via
-API/CLI (`curl`, `railway ssh`, Jest).
+**S9 (frontend): DONE for a Stage 1 MVP, verified.** Next.js + TypeScript + Tailwind app
+(`frontend/`), deployed as its own Railway service
+(`https://frontend-production-e6cf.up.railway.app`), with the backend's `ALLOWED_ORIGINS`
+updated to allow it. Verified end-to-end in a real browser against production: register
+(with the Terms & Conditions gate) → company creation → VAT calculation → tax-return
+validation, including the honest `MISSING_TAXPAYER_INFORMATION` path rendering correctly
+rather than a fabricated result. Covers auth/MFA code entry/org-switching, companies,
+compliance calendar, tax returns (validate/approve/submit-filing), and a Terms page.
+**Explicitly not built yet (Stage 2+)**: invoicing/expenses UI, document upload/OCR UI,
+scenario comparison UI, payroll UI, an admin rule-approval UI.
 **Org switching: DONE, verified.** `POST /auth/switch-organization`
 (`src/api/auth/auth.controller.ts`) re-issues a token scoped to an explicit target
 organization; tenant isolation (IDOR) covered by a dedicated test suite.
@@ -193,12 +203,19 @@ You're reading it.
    confirm the current US hosting region is compliant with safeguards, or migrate region.
 3. Set up external uptime/alerting (`docs/MONITORING.md`) — a human decision, ~15 minutes of
    work once decided.
-4. Build the frontend (S9) — explicitly next, per your own prioritization.
+4. ~~Build the frontend (S9)~~ — **done** for Stage 1; extend to invoicing/expenses/
+   documents/scenarios/payroll as Stage 2+.
 5. Build data-subject access/erasure endpoints and a breach-notification runbook before
    onboarding real external users (`docs/NDPR_GAP_ANALYSIS.md` §8-9, §5).
 6. Continue state-by-state research for the remaining 33 states before claiming full
    national coverage — currently only Enugu/Lagos/FCT are `FULLY_RESEARCHED`.
 
-**Test suite at time of writing:** 57 suites, 394 tests, all passing; clean `tsc --noEmit`.
-**Production deploy:** `https://api-production-2b6a.up.railway.app`, `/health/ready`
-returning `{"status":"ok","database":"reachable"}` as of this report.
+**Test suite at time of writing:** 58 backend suites, 397 backend tests, all passing; clean
+`tsc --noEmit` (backend and frontend). Frontend verified via real browser testing rather
+than an automated suite (no frontend test runner set up yet — a Stage 2 item).
+**Production deploy:** backend `https://api-production-2b6a.up.railway.app`, `/health/ready`
+returning `{"status":"ok","database":"reachable"}` as of this report; frontend
+`https://frontend-production-e6cf.up.railway.app`, registration verified end-to-end via a
+direct cross-origin `fetch()` from that exact origin (201 Created, real token, ~1.2s) and
+via full UI-driven flow in a real browser (register → dashboard → company → VAT calculation
+→ validation) during local development against the same production backend.

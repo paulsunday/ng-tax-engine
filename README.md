@@ -169,8 +169,11 @@ manual `railway up` step.
 - **OCR** (`tesseract.js`) runs fully offline/locally; field extraction is deterministic
   regex over the OCR text, never an LLM guess — accuracy is bounded by image quality, not
   tunable via a model.
-- **No production frontend exists yet.** Every verification so far (including the
-  production deploy) has been via `curl`/CLI against the API directly.
+- **Frontend is a Stage 1 MVP** (`frontend/`, Next.js + TypeScript + Tailwind, deployed as
+  its own Railway service at `frontend-production-e6cf.up.railway.app`), covering
+  auth/org-switching, companies, tax returns, and compliance calendar — verified end-to-end
+  in a real browser against production. Invoicing/expenses/documents/scenarios/payroll UI
+  are explicitly Stage 2+, not yet built.
 - **38 known npm advisories** (7 moderate, 31 high as of this writing), all in dev-only
   tooling (`jest`/`ts-node-dev`'s transitive deps) or `exceljs`'s `uuid` dependency — none
   reach `critical`, which is why CI's audit step gates at that threshold rather than
