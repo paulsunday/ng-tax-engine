@@ -22,6 +22,41 @@ export interface UploadDocumentInput {
 const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/bmp"];
 const OCR_ELIGIBLE_CATEGORIES: DocumentCategory[] = ["INVOICE", "RECEIPT", "PAYMENT_EVIDENCE"];
 
+// Deliberately NOT a blocklist — an allowlist is the only safe default for untrusted
+// uploads (mandate §19/§20: "Validate file type... Prevent malicious file uploads").
+// Explicitly excludes SVG (can embed script, an XSS vector if ever rendered inline) and
+// any executable/archive/markup type.
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  ...IMAGE_MIME_TYPES,
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "text/plain",
+]);
+
+/** Minimal magic-byte sanity check — not a full file-type sniffer, just enough to catch an obviously-mismatched/spoofed upload for the formats with an unambiguous signature. */
+function bufferMatchesClaimedType(buffer: Buffer, mimeType: string): boolean {
+  const bytes = buffer.subarray(0, 8);
+  switch (mimeType) {
+    case "application/pdf":
+      return bytes.subarray(0, 4).toString("ascii") === "%PDF";
+    case "image/png":
+      return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    case "image/jpeg":
+    case "image/jpg":
+      return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case "image/webp":
+      return bytes.subarray(0, 4).toString("ascii") === "RIFF";
+    case "image/bmp":
+      return bytes.subarray(0, 2).toString("ascii") === "BM";
+    default:
+      return true; // no single reliable signature for Office/CSV/plain-text formats — accepted on mimetype + allowlist alone
+  }
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -34,6 +69,22 @@ export class DocumentsService {
 
   async upload(organizationId: string, companyId: string, userId: string, input: UploadDocumentInput) {
     await this.companies.getOneOrThrow(organizationId, companyId);
+
+    if (!ALLOWED_DOCUMENT_MIME_TYPES.has(input.mimeType)) {
+      throw new BadRequestException(`File type "${input.mimeType}" is not allowed. Accepted types: PDF, common images, Word/Excel, CSV, plain text.`);
+    }
+    if (!input.buffer || input.buffer.length === 0) {
+      throw new BadRequestException("Uploaded file is empty.");
+    }
+    // The client-supplied mimetype is just a header an attacker fully controls — spot-check
+    // actual file magic bytes for the categories it would matter most to spoof (a renamed
+    // executable/script masquerading as a PDF or image). Office/CSV/text formats have no
+    // single reliable magic number, so they're accepted on mimetype alone — document
+    // storage never executes an uploaded file, so this gap is lower-severity than the
+    // image/PDF cases this check actually covers.
+    if (!bufferMatchesClaimedType(input.buffer, input.mimeType)) {
+      throw new BadRequestException("File content does not match its declared type — refusing to store a mismatched/spoofed upload.");
+    }
 
     const stored = await this.storage.save(organizationId, companyId, input.originalFileName, input.buffer);
     const isOcrEligible =

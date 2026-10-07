@@ -1,5 +1,5 @@
 import * as bcrypt from "bcrypt";
-import { ConflictException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "../../src/api/auth/auth.service";
 import { ROLES } from "../../src/api/common/rbac.constants";
 
@@ -241,6 +241,103 @@ describe("AuthService.listMyMemberships", () => {
 
     expect(result).toEqual([{ organizationId: "org-1", organizationName: "Org One", roleName: ROLES.ACCOUNTANT }]);
     expect(prisma.organizationUser.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "u1", status: "ACTIVE" } }));
+  });
+});
+
+describe("AuthService.changePassword", () => {
+  test("rejects an incorrect current password, and never touches passwordHash", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    const correctHash = await bcrypt.hash("correct-current", 4);
+    prisma.user.findUniqueOrThrow = jest.fn().mockResolvedValue({ id: "u1", passwordHash: correctHash });
+    prisma.user.update = jest.fn();
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await expect(service.changePassword("u1", "wrong-current", "brand-new-password")).rejects.toThrow(UnauthorizedException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("updates the password hash when the current password is correct", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    const correctHash = await bcrypt.hash("correct-current", 4);
+    prisma.user.findUniqueOrThrow = jest.fn().mockResolvedValue({ id: "u1", passwordHash: correctHash });
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await service.changePassword("u1", "correct-current", "brand-new-password");
+
+    const updateArgs = prisma.user.update.mock.calls[0][0];
+    expect(updateArgs.where).toEqual({ id: "u1" });
+    expect(await bcrypt.compare("brand-new-password", updateArgs.data.passwordHash)).toBe(true);
+    expect(auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: "CHANGE_PASSWORD", userId: "u1" }));
+  });
+});
+
+describe("AuthService.requestPasswordReset / resetPassword", () => {
+  test("requestPasswordReset returns the same generic message whether or not the email exists (no account enumeration)", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findUnique.mockResolvedValueOnce(null); // unknown email
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+    const unknownResult = await service.requestPasswordReset("nobody@example.com");
+
+    prisma.user.findUnique.mockResolvedValueOnce({ id: "u1", email: "a@b.com", isActive: true }); // known email
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    const knownResult = await service.requestPasswordReset("a@b.com");
+
+    expect(unknownResult).toEqual(knownResult);
+  });
+
+  test("requestPasswordReset stores only a hash of the token, never the raw token", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", email: "a@b.com", isActive: true });
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await service.requestPasswordReset("a@b.com");
+
+    const updateArgs = prisma.user.update.mock.calls[0][0];
+    expect(updateArgs.data.passwordResetTokenHash).toHaveLength(64); // sha256 hex digest length
+    expect(updateArgs.data.passwordResetExpiresAt).toBeInstanceOf(Date);
+  });
+
+  test("does not generate a reset token for a deactivated account", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", email: "a@b.com", isActive: false });
+    prisma.user.update = jest.fn();
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await service.requestPasswordReset("a@b.com");
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("resetPassword rejects an unknown or already-used token", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findFirst = jest.fn().mockResolvedValue(null);
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await expect(service.resetPassword("bogus-token", "brand-new-password")).rejects.toThrow(BadRequestException);
+  });
+
+  test("resetPassword rejects an expired token", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findFirst = jest.fn().mockResolvedValue({ id: "u1", passwordResetExpiresAt: new Date(Date.now() - 1000) });
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await expect(service.resetPassword("some-token", "brand-new-password")).rejects.toThrow(/expired/);
+  });
+
+  test("resetPassword succeeds for a valid, unexpired token and clears the token fields (single-use)", async () => {
+    const { prisma, jwt, auditLog, mfa } = makeMocks();
+    prisma.user.findFirst = jest.fn().mockResolvedValue({ id: "u1", passwordResetExpiresAt: new Date(Date.now() + 60_000) });
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    const service = new AuthService(prisma, jwt, auditLog, mfa);
+
+    await service.resetPassword("valid-token", "brand-new-password");
+
+    const updateArgs = prisma.user.update.mock.calls[0][0];
+    expect(updateArgs.data.passwordResetTokenHash).toBeNull();
+    expect(updateArgs.data.passwordResetExpiresAt).toBeNull();
+    expect(await bcrypt.compare("brand-new-password", updateArgs.data.passwordHash)).toBe(true);
   });
 });
 

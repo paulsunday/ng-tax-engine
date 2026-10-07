@@ -88,7 +88,7 @@ describe("DocumentsService.upload", () => {
       category: "INVOICE",
       originalFileName: "inv.png",
       mimeType: "image/png",
-      buffer: Buffer.from("x"),
+      buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
     });
     expect(invoiceDoc.ocrStatus).toBe("PENDING");
 
@@ -99,5 +99,71 @@ describe("DocumentsService.upload", () => {
       buffer: Buffer.from("x"),
     });
     expect(contractDoc.ocrStatus).toBe("NOT_APPLICABLE");
+  });
+});
+
+describe("DocumentsService.upload — file validation (mandate §19/§20)", () => {
+  function makeMocks() {
+    const prisma: any = { document: { create: jest.fn() } };
+    const companies: any = { getOneOrThrow: jest.fn().mockResolvedValue({ id: "company-1" }) };
+    const auditLog: any = { record: jest.fn() };
+    const storage: any = { save: jest.fn().mockResolvedValue({ storagePath: "/tmp/x", sizeBytes: 100, checksumSha256: "abc" }) };
+    const ocrAdapter: any = {};
+    return { prisma, companies, auditLog, storage, ocrAdapter };
+  }
+
+  test("rejects a disallowed MIME type (e.g. an executable) outright", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    await expect(
+      service.upload("org-1", "company-1", "user-1", {
+        category: "OTHER",
+        originalFileName: "innocuous.pdf.exe",
+        mimeType: "application/x-msdownload",
+        buffer: Buffer.from([0x4d, 0x5a]),
+      })
+    ).rejects.toThrow(BadRequestException);
+    expect(storage.save).not.toHaveBeenCalled();
+  });
+
+  test("rejects an empty file", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    await expect(
+      service.upload("org-1", "company-1", "user-1", { category: "OTHER", originalFileName: "empty.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(0) })
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  test("rejects a file whose content doesn't match its claimed type (spoofed mimetype)", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    await expect(
+      service.upload("org-1", "company-1", "user-1", {
+        category: "OTHER",
+        originalFileName: "fake.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("this is not actually a pdf"),
+      })
+    ).rejects.toThrow(/does not match its declared type/);
+    expect(storage.save).not.toHaveBeenCalled();
+  });
+
+  test("accepts a genuine PDF (real magic bytes, allowed mimetype)", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    prisma.document.create.mockImplementation(async ({ data }: any) => ({ id: "doc-1", ...data }));
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    await expect(
+      service.upload("org-1", "company-1", "user-1", {
+        category: "OTHER",
+        originalFileName: "real.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("%PDF-1.4\n%real pdf content"),
+      })
+    ).resolves.toBeDefined();
+    expect(storage.save).toHaveBeenCalled();
   });
 });

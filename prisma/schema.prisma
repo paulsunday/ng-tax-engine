@@ -46,6 +46,11 @@ model User {
   mfaEnabled      Boolean  @default(false)
   mfaSecret       String?  // TOTP secret, never returned by any API response
   isActive        Boolean  @default(true)
+  // Password reset (mandate §11). Only the HASH of the reset token is ever stored — same
+  // principle as passwordHash itself — so a database read alone can never yield a usable
+  // token. Single-use: both fields are cleared the moment a reset succeeds.
+  passwordResetTokenHash  String?
+  passwordResetExpiresAt  DateTime?
   createdAt       DateTime @default(now())
 
   memberships     OrganizationUser[]
