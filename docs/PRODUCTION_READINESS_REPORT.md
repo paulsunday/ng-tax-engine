@@ -234,8 +234,11 @@ You're reading it.
    **done**: `GET/POST /users/me/export-data`/`request-erasure`, plus
    `docs/BREACH_NOTIFICATION_RUNBOOK.md` and `docs/DPIA.md`. Both still need a DPO to
    actually own and sign off on them.
-6. Continue state-by-state research for the remaining 33 states before claiming full
-   national coverage — currently only Enugu/Lagos/FCT are `FULLY_RESEARCHED`.
+6. Continue state-by-state research for the remaining 30 states before claiming full
+   national coverage — Enugu, Lagos, FCT, Kano, Rivers, and Ogun are now `FULLY_RESEARCHED`
+   (6 of 37). This is realistically an ongoing, multi-session effort at the rigor this
+   project holds itself to (a real browse of each state's live official site, not a
+   secondary-source guess) — not something to rush to "done" in one pass.
 
 **Test suite at time of writing:** 58 backend suites, 400 backend tests, all passing; clean
 `tsc --noEmit` and `next build` (backend and frontend, 22 frontend routes). Frontend
