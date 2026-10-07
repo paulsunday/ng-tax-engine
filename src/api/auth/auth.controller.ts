@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from "@nestjs/common";
 import { Throttle, seconds } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { JwtPayload } from "../common/rbac.constants";
 import { MfaCodeDto } from "./dto/mfa-code.dto";
+import { SwitchOrganizationDto } from "./dto/switch-organization.dto";
 
 // 5 attempts/minute per IP on every credential-bearing auth endpoint — brute-force and
 // credential-stuffing protection (brief §41). Tighter than the app-wide default limit.
@@ -48,5 +49,18 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   disableMfa(@CurrentUser() user: JwtPayload, @Body() dto: MfaCodeDto) {
     return this.authService.disableMfa(user.sub, dto.totpCode);
+  }
+
+  @Get("memberships")
+  @UseGuards(JwtAuthGuard)
+  listMyMemberships(@CurrentUser() user: JwtPayload) {
+    return this.authService.listMyMemberships(user.sub);
+  }
+
+  @Post("switch-organization")
+  @UseGuards(JwtAuthGuard)
+  @Throttle(AUTH_THROTTLE)
+  switchOrganization(@CurrentUser() user: JwtPayload, @Body() dto: SwitchOrganizationDto) {
+    return this.authService.switchOrganization(user.sub, dto.organizationId);
   }
 }

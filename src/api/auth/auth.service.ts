@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
@@ -64,7 +64,17 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto): Promise<{ accessToken: string }> {
+  /**
+   * Issues a token scoped to a specific org ONLY when there is exactly one active
+   * membership to choose from — that is "the only option," not "the first of several
+   * silently guessed" (mandate §10: remove the behaviour where a multi-org user is
+   * automatically placed into the first membership). With 2+ active memberships, the
+   * returned token deliberately carries organizationId=null (every org-scoped endpoint
+   * already rejects that — TenantGuard/CompaniesService/AiToolsService all do this today)
+   * and the caller must call switchOrganization to get a token actually usable for
+   * company data.
+   */
+  async login(dto: LoginDto): Promise<{ accessToken: string; requiresOrganizationSelection: boolean; organizations: { organizationId: string; organizationName: string; roleName: string }[] }> {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user || !user.isActive) throw new UnauthorizedException("Invalid credentials.");
 
@@ -79,37 +89,72 @@ export class AuthService {
       if (!this.mfa.verify(dto.totpCode, user.mfaSecret)) throw new UnauthorizedException("Invalid MFA code.");
     }
 
-    // Phase 1 simplification: log in to the first ACTIVE membership found. A user who
-    // belongs to multiple organizations will need an org-switcher endpoint (Phase 2+) to
-    // re-issue a token scoped to a different membership.
-    const membership = await this.prisma.organizationUser.findFirst({
+    const memberships = await this.prisma.organizationUser.findMany({
       where: { userId: user.id, status: "ACTIVE" },
-      include: { role: true },
+      include: { role: true, organization: true },
     });
 
-    if (!membership && !user.isPlatformAdmin) {
+    if (memberships.length === 0 && !user.isPlatformAdmin) {
       throw new UnauthorizedException("User has no active organization membership.");
     }
 
     await this.auditLog.record({
-      organizationId: membership?.organizationId ?? null,
+      organizationId: memberships.length === 1 ? memberships[0].organizationId : null,
       userId: user.id,
       action: "LOGIN",
       objectType: "User",
       objectId: user.id,
     });
 
+    const soleMembership = memberships.length === 1 ? memberships[0] : null;
     return {
       accessToken: this.signToken(
         user.id,
         user.email,
-        membership?.organizationId ?? null,
-        membership?.roleId ?? null,
-        membership?.role.name ?? null,
+        soleMembership?.organizationId ?? null,
+        soleMembership?.roleId ?? null,
+        soleMembership?.role.name ?? null,
         user.isPlatformAdmin,
         user.isTaxRuleApprover
       ),
+      requiresOrganizationSelection: memberships.length > 1,
+      organizations: memberships.map((m) => ({ organizationId: m.organizationId, organizationName: m.organization.name, roleName: m.role.name })),
     };
+  }
+
+  /** The organisation switcher (mandate §10) — the active organisation is always explicit, re-issued as a brand-new token, never inferred. Callable whether the caller currently has an org selected or not. */
+  async switchOrganization(userId: string, targetOrganizationId: string): Promise<{ accessToken: string }> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId: targetOrganizationId, status: "ACTIVE" },
+      include: { role: true },
+    });
+
+    if (!membership) {
+      // Same error regardless of whether the org exists at all — never confirm/deny
+      // existence of an organisation the caller isn't a member of (brief §4 IDOR principle).
+      throw new ForbiddenException("No active membership in that organization.");
+    }
+
+    await this.auditLog.record({
+      organizationId: targetOrganizationId,
+      userId,
+      action: "SWITCH_ORGANIZATION",
+      objectType: "User",
+      objectId: userId,
+    });
+
+    return {
+      accessToken: this.signToken(user.id, user.email, membership.organizationId, membership.roleId, membership.role.name, user.isPlatformAdmin, user.isTaxRuleApprover),
+    };
+  }
+
+  async listMyMemberships(userId: string) {
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: { userId, status: "ACTIVE" },
+      include: { role: true, organization: true },
+    });
+    return memberships.map((m) => ({ organizationId: m.organizationId, organizationName: m.organization.name, roleName: m.role.name }));
   }
 
   /**
