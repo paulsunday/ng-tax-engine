@@ -33,7 +33,8 @@ function parseStatementDate(raw: string): string | null {
 
   const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (dmy) {
-    let [, d, m, y] = dmy;
+    const [, d, m] = dmy;
+    let y = dmy[3];
     if (y.length === 2) y = `20${y}`;
     const day = d.padStart(2, "0");
     const month = m.padStart(2, "0");

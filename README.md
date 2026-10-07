@@ -117,21 +117,38 @@ DB connectivity).
 ## Testing
 
 ```bash
-npm test
+npm run lint      # eslint
+npx tsc --noEmit  # type-check
+npm test          # 358 tests across 53 suites, all unit tests against a mocked PrismaService
+npm run build
 ```
 
-313 tests across 50 suites, all unit tests against a mocked `PrismaService` — **this
-environment has no live PostgreSQL instance**, so nothing here has been exercised against a
-real database. `tests/api/app-module-wiring.test.ts` does compile the entire NestJS DI graph
-(every module/controller/service/guard resolves) with `PrismaService` stubbed out, which
-catches wiring mistakes (missing providers, circular imports) without needing a live DB — but
-it is not a substitute for an end-to-end test against Postgres before shipping.
+`tests/api/app-module-wiring.test.ts` compiles the entire NestJS DI graph (every module/
+controller/service/guard resolves) with `PrismaService` stubbed out, which catches wiring
+mistakes (missing providers, circular imports) without needing a live DB.
+
+The application IS deployed against a real, live PostgreSQL instance (Railway), with
+point-in-time recovery enabled and a real restore verified — see
+`docs/DISASTER_RECOVERY.md`. The unit test suite itself still mocks `PrismaService`
+throughout, by design — it is not a substitute for the migration-validation step below.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every PR/push to `master`/`main`: lint, type-check,
+`prisma validate`, `prisma migrate deploy` against a real ephemeral Postgres service
+container (genuine migration validation, not just a schema syntax check), the full test
+suite, the build, and a dependency audit (reporting only at the `critical` threshold — see
+"Known limitations" for the tracked moderate/high advisories in dev-only tooling
+dependencies). There is no deployment job in this workflow; deployment is a separate,
+manual `railway up` step.
 
 ## Known limitations / explicitly out of scope
 
-- **No live database was available in this environment.** All business logic is unit-tested
-  against a mocked `PrismaService`; Prisma migrations have not been run against a real
-  Postgres instance here.
+- **No statutory tax rule is APPROVED/ACTIVE yet.** The full governance workflow exists
+  (see "Rule governance" above) and 19 researched candidate rules are loaded in production,
+  but every one of them still needs a qualified tax professional to run it through
+  verify → submit-for-approval → approve → activate. Until that happens, every tax
+  calculation correctly reports `PENDING_RULE_APPROVAL`, never a fabricated number.
 - **No real LLM integration.** See "AI tool dispatcher" above — the controlled tool layer
   exists; wiring an actual model to call it does not.
 - **No real government e-filing API.** Filing always produces a manual package for human
@@ -140,9 +157,17 @@ it is not a substitute for an end-to-end test against Postgres before shipping.
 - **Single-organization login.** `AuthService.login` logs into the first active membership
   found; a user belonging to multiple organizations needs an org-switcher endpoint
   (unbuilt) to get a token scoped to a different membership.
-- **Local-disk document storage** (`FILE_STORAGE_ROOT`) does not survive a redeploy or
-  horizontal scale-out — swap `LocalFileStorageAdapter` for an S3/Blob-backed adapter before
-  running more than one instance.
+- **Document storage** (`FILE_STORAGE_ROOT`) is a single Railway volume mounted on one
+  instance — it survives redeploys, but not horizontal scale-out (multiple replicas would
+  each see their own empty volume). Swap `LocalFileStorageAdapter` for an S3/Blob-backed
+  adapter before running more than one instance.
 - **OCR** (`tesseract.js`) runs fully offline/locally; field extraction is deterministic
   regex over the OCR text, never an LLM guess — accuracy is bounded by image quality, not
   tunable via a model.
+- **No production frontend exists yet.** Every verification so far (including the
+  production deploy) has been via `curl`/CLI against the API directly.
+- **38 known npm advisories** (7 moderate, 31 high as of this writing), all in dev-only
+  tooling (`jest`/`ts-node-dev`'s transitive deps) or `exceljs`'s `uuid` dependency — none
+  reach `critical`, which is why CI's audit step gates at that threshold rather than
+  blocking on these. Re-run `npm audit` periodically; `npm audit fix --force` pulls in
+  breaking major-version bumps (jest 30, exceljs 3.x) not yet evaluated.

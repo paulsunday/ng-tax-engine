@@ -58,7 +58,8 @@ function parseIsoOrDmy(raw: string): string | null {
 
   const dmy = raw.match(DMY_DATE);
   if (dmy) {
-    let [, d, m, y] = dmy;
+    const [, d, m] = dmy;
+    let y = dmy[3];
     if (y.length === 2) y = `20${y}`;
     if (Number(m) > 12) return null; // ambiguous — do not guess MM/DD
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
