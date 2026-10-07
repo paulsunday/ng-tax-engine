@@ -26,6 +26,13 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
+  // Terms & Conditions acceptance (mandate: "any company registering must accept before
+  // they proceed"). Recorded at the moment of self-service registration, never inferred —
+  // null means genuinely never accepted, not "assumed yes." termsVersion lets a future
+  // re-acceptance requirement distinguish "accepted the current terms" from "accepted an
+  // old version" without losing the historical fact of what was actually agreed to.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
 
   members   OrganizationUser[]
   companies Company[]

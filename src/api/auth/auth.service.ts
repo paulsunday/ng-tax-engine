@@ -11,6 +11,10 @@ import { MfaService } from "./mfa.service";
 
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+// Bump this string whenever the published Terms & Conditions change materially — it is
+// stored on the organization at acceptance time, so "which version did this company
+// actually agree to" stays answerable even after the text is later updated.
+export const CURRENT_TERMS_VERSION = "2026-10-07";
 
 @Injectable()
 export class AuthService {
@@ -43,7 +47,9 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
     const { user, organization, membership } = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({ data: { name: dto.organizationName } });
+      const organization = await tx.organization.create({
+        data: { name: dto.organizationName, termsAcceptedAt: new Date(), termsVersion: CURRENT_TERMS_VERSION },
+      });
       const user = await tx.user.create({
         data: { email: dto.email, passwordHash, fullName: dto.fullName },
       });

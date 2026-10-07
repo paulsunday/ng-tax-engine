@@ -28,7 +28,7 @@ describe("AuthService.register", () => {
     const service = new AuthService(prisma, jwt, auditLog, mfa);
 
     await expect(
-      service.register({ email: "dup@example.com", password: "password1234", fullName: "Dup User", organizationName: "Dup Co" })
+      service.register({ email: "dup@example.com", password: "password1234", fullName: "Dup User", organizationName: "Dup Co", acceptedTerms: true })
     ).rejects.toThrow(ConflictException);
   });
 
@@ -39,7 +39,7 @@ describe("AuthService.register", () => {
     const service = new AuthService(prisma, jwt, auditLog, mfa);
 
     await expect(
-      service.register({ email: "new@example.com", password: "password1234", fullName: "New User", organizationName: "New Co" })
+      service.register({ email: "new@example.com", password: "password1234", fullName: "New User", organizationName: "New Co", acceptedTerms: true })
     ).rejects.toThrow(/seed-rbac/);
   });
 
@@ -57,11 +57,15 @@ describe("AuthService.register", () => {
       password: "password1234",
       fullName: "New User",
       organizationName: "New Co",
+      acceptedTerms: true,
     });
 
     expect(prisma.user.create).toHaveBeenCalled();
     const createdUserArgs = prisma.user.create.mock.calls[0][0].data;
     expect(createdUserArgs.passwordHash).not.toBe("password1234"); // never store the plaintext
+    const createdOrgArgs = prisma.organization.create.mock.calls[0][0].data;
+    expect(createdOrgArgs.termsAcceptedAt).toBeInstanceOf(Date); // real acceptance recorded, not assumed
+    expect(createdOrgArgs.termsVersion).toBeTruthy();
     expect(await bcrypt.compare("password1234", createdUserArgs.passwordHash)).toBe(true);
 
     expect(auditLog.record).toHaveBeenCalledWith(
