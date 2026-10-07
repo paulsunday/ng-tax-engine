@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../common/guards/permissions.guard";
 import { RequirePermissions } from "../common/decorators/permissions.decorator";
@@ -42,5 +42,18 @@ export class FilingController {
   listAttempts(@CurrentUser() user: JwtPayload, @Param("companyId") companyId: string, @Param("taxReturnId") taxReturnId: string) {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");
     return this.filing.listAttempts(user.organizationId, companyId, taxReturnId);
+  }
+}
+
+@Controller("companies/:companyId/filing-capability")
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class FilingCapabilityController {
+  constructor(private readonly filing: FilingService) {}
+
+  @Get()
+  @RequirePermissions(PERMISSIONS.VIEW_TAX_HISTORY)
+  getCapability(@CurrentUser() user: JwtPayload, @Param("companyId") companyId: string, @Query("taxType") taxType: string) {
+    if (!user.organizationId) throw new ForbiddenException("No organization context.");
+    return this.filing.getAuthorityCapability(user.organizationId, companyId, taxType);
   }
 }

@@ -7,6 +7,7 @@ import {
   SubmissionStatus,
   ReceiptResult,
   PaymentStatusResult,
+  FilingCapability,
 } from "./TaxAuthorityAdapter";
 
 /**
@@ -23,6 +24,10 @@ import {
 export class ManualFilingAdapter implements TaxAuthorityAdapter {
   readonly authorityName: string;
   readonly supportsAutomaticSubmission = false;
+  // Separately overridable per authority — a subclass that confirms a real export/API
+  // capability should override these, not supportsAutomaticSubmission alone.
+  readonly filingCapability: FilingCapability = "MANUAL_OFFICIAL_PORTAL";
+  readonly paymentCapability: FilingCapability = "MANUAL_OFFICIAL_PORTAL";
 
   constructor(authorityName: string) {
     this.authorityName = authorityName;

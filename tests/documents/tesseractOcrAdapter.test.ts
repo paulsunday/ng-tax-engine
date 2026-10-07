@@ -1,7 +1,8 @@
+import * as path from "path";
 import { Jimp, loadFont } from "jimp";
 // @ts-ignore — jimp ships its built-in bitmap fonts under this subpath without its own .d.ts
 import * as fonts from "jimp/fonts";
-import { TesseractOcrAdapter } from "../../src/documents/ocr/TesseractOcrAdapter";
+import { TesseractOcrAdapter, OcrEngineUnavailableError } from "../../src/documents/ocr/TesseractOcrAdapter";
 
 /**
  * Real, end-to-end OCR test: renders an actual PNG with text (via Jimp, pure JS, no
@@ -42,5 +43,23 @@ describe("TesseractOcrAdapter (real OCR engine, no mocks)", () => {
 
     expect(result.fields.invoiceNumber).toBeNull();
     expect(result.fields.totalAmountNgn).toBeNull();
+  });
+});
+
+/**
+ * Mandate §20: "Test OCR failure scenarios." The engine must fail loudly and cleanly —
+ * never silently fall back to an uncontrolled CDN fetch — when its bundled language
+ * data isn't where it's expected. Pointing at a nonexistent local directory forces
+ * exactly the failure a broken/incomplete deploy would hit.
+ */
+describe("TesseractOcrAdapter — OCR failure scenario (mandate §20)", () => {
+  jest.setTimeout(30_000);
+
+  test("fails with a clear OcrEngineUnavailableError instead of hanging or silently reaching the network", async () => {
+    const brokenAdapter = new TesseractOcrAdapter(path.join(__dirname, "no-such-bundled-lang-dir"));
+
+    await expect(brokenAdapter.extract(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).rejects.toThrow(OcrEngineUnavailableError);
+
+    await brokenAdapter.terminate();
   });
 });

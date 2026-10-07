@@ -12,6 +12,23 @@
 
 export type SubmissionStatus = "NOT_SUBMITTED" | "PENDING" | "ACCEPTED" | "REJECTED" | "ERROR";
 
+/**
+ * Production-readiness mandate §21: classify filing capability honestly per authority —
+ * never claim automatic filing unless the application has VERIFIED technical capability to
+ * submit through an official mechanism. The same classification applies to payment.
+ *   OFFICIAL_API_VERIFIED    a real, documented authority API has been confirmed and is wired up
+ *   OFFICIAL_PORTAL_ASSISTED the authority's own portal exposes a guided/automatable flow this adapter drives
+ *   OFFICIAL_EXPORT_SUPPORTED the authority accepts a structured bulk-import file this adapter can generate
+ *   MANUAL_OFFICIAL_PORTAL   a human must re-key this adapter's output into the authority's own web form
+ *   NOT_YET_AVAILABLE        no official channel of any kind has been confirmed for this authority
+ */
+export type FilingCapability =
+  | "OFFICIAL_API_VERIFIED"
+  | "OFFICIAL_PORTAL_ASSISTED"
+  | "OFFICIAL_EXPORT_SUPPORTED"
+  | "MANUAL_OFFICIAL_PORTAL"
+  | "NOT_YET_AVAILABLE";
+
 export interface TaxpayerRecord {
   tin: string;
   name: string;
@@ -54,6 +71,9 @@ export interface PaymentStatusResult {
 export interface TaxAuthorityAdapter {
   readonly authorityName: string;
   readonly supportsAutomaticSubmission: boolean;
+  /** Payment classification deliberately separate from filing — a channel can take payment (e.g. Remita/Flutterwave) with zero filing automation, and the two must never be conflated (mandate §22). */
+  readonly filingCapability: FilingCapability;
+  readonly paymentCapability: FilingCapability;
 
   getTaxpayer(tin: string): Promise<TaxpayerRecord | null>;
   validateTaxpayer(tin: string): Promise<ValidationResult>;

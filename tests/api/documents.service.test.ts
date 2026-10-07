@@ -167,3 +167,40 @@ describe("DocumentsService.upload — file validation (mandate §19/§20)", () =
     expect(storage.save).toHaveBeenCalled();
   });
 });
+
+describe("DocumentsService.runExtraction — OCR failure scenario (mandate §20)", () => {
+  function pendingImageDoc() {
+    return { id: "doc-1", companyId: "company-1", ocrStatus: "PENDING", mimeType: "image/png", storagePath: "/tmp/doc-1.png" };
+  }
+
+  test("marks the document FAILED and propagates the error when the OCR engine itself fails, instead of fabricating a result", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    prisma.document.findUnique.mockResolvedValue(pendingImageDoc());
+    storage.read.mockResolvedValue(Buffer.from("fake-image-bytes"));
+    ocrAdapter.extract.mockRejectedValue(new Error("OCR engine failed to initialize: bundled language data not found"));
+    prisma.document.update.mockImplementation(async ({ data }: any) => ({ id: "doc-1", ...data }));
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    await expect(service.runExtraction("org-1", "company-1", "doc-1")).rejects.toThrow(/OCR engine failed/);
+
+    expect(prisma.document.update).toHaveBeenCalledWith({ where: { id: "doc-1" }, data: { ocrStatus: "FAILED" } });
+  });
+
+  test("marks the document COMPLETED with the real extracted fields when OCR succeeds", async () => {
+    const { prisma, companies, auditLog, storage, ocrAdapter } = makeMocks();
+    prisma.document.findUnique.mockResolvedValue(pendingImageDoc());
+    storage.read.mockResolvedValue(Buffer.from("fake-image-bytes"));
+    ocrAdapter.extract.mockResolvedValue({
+      rawText: "INVOICE NO: INV-99",
+      fields: { invoiceNumber: "INV-99" },
+      fieldConfidence: { invoiceNumber: "HIGH" },
+      engineUsed: "tesseract.js (eng)",
+    });
+    prisma.document.update.mockImplementation(async ({ data }: any) => ({ id: "doc-1", ...data }));
+    const service = new DocumentsService(prisma, companies, auditLog, storage, ocrAdapter);
+
+    const result = await service.runExtraction("org-1", "company-1", "doc-1");
+
+    expect(result.ocrStatus).toBe("COMPLETED");
+  });
+});

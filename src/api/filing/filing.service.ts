@@ -102,7 +102,31 @@ export class FilingService {
       newValue: { succeeded: result.succeeded, authority: adapter.authorityName, mode },
     });
 
-    return { succeeded: result.succeeded, filingAttempt: attempt, filingPackage: result.rawResponse };
+    return {
+      succeeded: result.succeeded,
+      filingAttempt: attempt,
+      filingPackage: result.rawResponse,
+      filingCapability: adapter.filingCapability,
+      paymentCapability: adapter.paymentCapability,
+    };
+  }
+
+  /**
+   * Lets a caller check what this authority can actually do BEFORE attempting a submission
+   * — e.g. a frontend showing "this will require you to file manually" upfront rather than
+   * only after a failed attempt (mandate §21).
+   */
+  async getAuthorityCapability(organizationId: string, companyId: string, taxType: string) {
+    await this.companies.getOneOrThrow(organizationId, companyId);
+    const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    const authorityKey = taxType === "PAYE" ? company.headOfficeStateCode : "FEDERAL";
+    const adapter = this.adapters.get(authorityKey);
+    return {
+      authorityName: adapter.authorityName,
+      supportsAutomaticSubmission: adapter.supportsAutomaticSubmission,
+      filingCapability: adapter.filingCapability,
+      paymentCapability: adapter.paymentCapability,
+    };
   }
 
   async recordManualReceipt(organizationId: string, companyId: string, userId: string, taxReturnId: string, receiptReference: string, submissionReference: string) {

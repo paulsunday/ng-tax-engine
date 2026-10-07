@@ -12,6 +12,8 @@ function makeMocks() {
   const adapter = {
     authorityName: "Nigeria Revenue Service (NRS)",
     supportsAutomaticSubmission: false,
+    filingCapability: "MANUAL_OFFICIAL_PORTAL",
+    paymentCapability: "MANUAL_OFFICIAL_PORTAL",
     validateReturn: jest.fn().mockResolvedValue({ valid: true, errors: [] }),
     submitReturn: jest.fn().mockResolvedValue({ succeeded: false, errorClass: "VALIDATION", rawResponse: { reason: "no API" } }),
   };
@@ -100,5 +102,46 @@ describe("FilingService.submit", () => {
 
     expect(result.succeeded).toBe(false);
     expect(adapter.submitReturn).not.toHaveBeenCalled();
+  });
+
+  test("a successful submission's response reports the honest filing/payment capability, never implying automation that doesn't exist", async () => {
+    const { prisma, companies, auditLog, adapters, adapter } = makeMocks();
+    adapter.submitReturn.mockResolvedValue({ succeeded: true, submissionReference: "SUB-123" });
+    prisma.taxReturn.findUnique.mockResolvedValue(approvedReturn());
+    prisma.company.findUniqueOrThrow.mockResolvedValue({ tin: "TIN-1", headOfficeStateCode: "EN" });
+    prisma.filingAttempt.create.mockResolvedValue({ id: "attempt-1" });
+    const service = new FilingService(prisma, companies, auditLog, adapters);
+
+    const result = await service.submit("org-1", "company-1", "user-1", "ret-1", "MANUAL");
+
+    expect(result.filingCapability).toBe("MANUAL_OFFICIAL_PORTAL");
+    expect(result.paymentCapability).toBe("MANUAL_OFFICIAL_PORTAL");
+  });
+});
+
+describe("FilingService.getAuthorityCapability", () => {
+  test("reports the resolved authority's name and capability before any submission is attempted", async () => {
+    const { prisma, companies, auditLog, adapters } = makeMocks();
+    prisma.company.findUniqueOrThrow.mockResolvedValue({ headOfficeStateCode: "EN" });
+    const service = new FilingService(prisma, companies, auditLog, adapters);
+
+    const result = await service.getAuthorityCapability("org-1", "company-1", "VAT");
+
+    expect(result).toEqual({
+      authorityName: "Nigeria Revenue Service (NRS)",
+      supportsAutomaticSubmission: false,
+      filingCapability: "MANUAL_OFFICIAL_PORTAL",
+      paymentCapability: "MANUAL_OFFICIAL_PORTAL",
+    });
+  });
+
+  test("routes PAYE to the head-office-state adapter, same as submit()", async () => {
+    const { prisma, companies, auditLog, adapters } = makeMocks();
+    prisma.company.findUniqueOrThrow.mockResolvedValue({ headOfficeStateCode: "LA" });
+    const service = new FilingService(prisma, companies, auditLog, adapters);
+
+    await service.getAuthorityCapability("org-1", "company-1", "PAYE");
+
+    expect(adapters.get).toHaveBeenCalledWith("LA");
   });
 });
