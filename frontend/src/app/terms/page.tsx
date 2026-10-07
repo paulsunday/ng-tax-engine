@@ -1,4 +1,4 @@
-export const TERMS_VERSION = "2026-10-07";
+export const TERMS_VERSION = "2026-10-07b";
 
 export default function TermsPage() {
   return (
@@ -26,19 +26,27 @@ export default function TermsPage() {
 
       <h2 className="font-semibold mt-8 mb-2">2. Nature of the service</h2>
       <p>
-        This platform is a software tool for accounting, bookkeeping, tax calculation, and
-        tax-compliance tracking under Nigerian tax law — principally the Nigeria Tax Act
-        2025 and the Nigeria Tax Administration Act 2025. It is <strong>not</strong> a
-        licensed tax practitioner, chartered accountant, or law firm, and nothing in the
-        platform constitutes professional tax, accounting, or legal advice. Every tax
-        calculation traces to a specific, version-controlled statutory rule, and a
-        calculation is withheld (reported as &quot;pending rule approval&quot;) rather than
-        guessed whenever the governing rule has not yet been confirmed by a qualified tax
-        professional within your organization. You remain solely responsible for the
-        accuracy of your company&apos;s tax filings and for engaging a licensed tax
-        professional or chartered accountant as required by Nigerian law (including, where
+        This platform is a professional productivity tool <strong>built for accountants,
+        auditors, and tax practitioners</strong> — it is designed to be operated by, or
+        under the supervision of, a qualified accounting or tax professional acting for
+        their own firm or for client companies, making routine accounting, audit support,
+        and tax-compliance work faster and less error-prone. It is <strong>not</strong> a
+        substitute for that professional, and the platform itself is not a licensed tax
+        practitioner, chartered accountant, or law firm — it does not offer accounting,
+        audit, or tax advisory services directly to the public, and nothing in the
+        platform constitutes professional tax, accounting, or legal advice in place of
+        the judgment of the qualified professional using it. Every tax calculation traces
+        to a specific, version-controlled statutory rule, and a calculation is withheld
+        (reported as &quot;pending rule approval&quot;) rather than guessed whenever the
+        governing rule has not yet been confirmed by a qualified tax professional within
+        your organization — the tool is deliberately built to defer to that professional's
+        sign-off rather than act on its own authority. The accountant, auditor, or firm
+        operating this platform remains solely responsible for the accuracy of any
+        company&apos;s tax filings and for holding the licenses/registrations Nigerian law
+        requires for the professional services they themselves provide (including, where
         applicable, the requirement under the Nigeria Tax Administration Act for certain
-        filings to be certified by a professional).
+        filings to be certified by a professional, and any applicable FRCN, ICAN, or ANAN
+        registration for the individual or firm offering those services).
       </p>
 
       <h2 className="font-semibold mt-8 mb-2">3. Filing with government authorities</h2>

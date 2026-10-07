@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "NG Tax Engine",
-  description: "Nigerian multi-tenant accounting / tax-compliance platform",
+  description: "Built for accountants, auditors, and tax professionals — accounting, audit support, and tax filing made fast and reliable.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

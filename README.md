@@ -1,7 +1,9 @@
 # NG Tax Engine
 
-A multi-tenant Nigerian accounting / audit / tax-compliance / tax-filing platform, built on
-two stacked specifications:
+A multi-tenant platform **built for accountants, auditors, and tax professionals** —
+it's the tool they use to make accounting, audit support, and tax filing fast and
+reliable for their own firm or for client companies, not a replacement for their
+professional judgment. Built on two stacked specifications:
 
 1. A **source-verified tax rules engine** (`src/engine`, `src/rules`, `research/`) — every
    statutory figure (rate, threshold, deadline) traces to a cited, version-controlled
