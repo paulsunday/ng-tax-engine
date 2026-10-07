@@ -9,8 +9,10 @@ ALTER TABLE "TaxDeadlineRule" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "TaxPenaltyRule" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "TaxInterestRule" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "TaxRuleVersion" ALTER COLUMN "status" TYPE "RuleStatus_new" USING ("status"::text::"RuleStatus_new");
-ALTER TABLE "TaxRuleChangeHistory" ALTER COLUMN "previousStatus" TYPE "RuleStatus_new" USING ("previousStatus"::text::"RuleStatus_new");
-ALTER TABLE "TaxRuleChangeHistory" ALTER COLUMN "newStatus" TYPE "RuleStatus_new" USING ("newStatus"::text::"RuleStatus_new");
+-- NOTE: TaxRuleChangeHistory does not exist yet at this point in the script (it is created
+-- further down, after this enum swap) — the generated diff incorrectly tried to ALTER a
+-- column on it here. It's created below using the final "RuleStatus" type name directly,
+-- so no ALTER is needed for it at all; removed.
 ALTER TABLE "TaxDeadlineRule" ALTER COLUMN "status" TYPE "RuleStatus_new" USING ("status"::text::"RuleStatus_new");
 ALTER TABLE "TaxPenaltyRule" ALTER COLUMN "status" TYPE "RuleStatus_new" USING ("status"::text::"RuleStatus_new");
 ALTER TABLE "TaxInterestRule" ALTER COLUMN "status" TYPE "RuleStatus_new" USING ("status"::text::"RuleStatus_new");
