@@ -316,9 +316,37 @@
     {
       "state_code": "KN",
       "state_name": "Kano",
-      "revenue_authority_name": "Kano State Internal Revenue Service",
+      "revenue_authority_name": "Kano State Internal Revenue Service (KIRS)",
       "official_website": "https://kirs.gov.ng",
-      "verification_status": "LOCATED_SECONDARY_SOURCE_UNVERIFIED"
+      "taxpayer_portal": "E-Tax (etax.kirs.gov.ng, also linked as etax.kn.gov.ng for login) — confirmed live, with a dated \"Guideline for Filing Individual Tax Returns on the Electronic Tax Platform under the Nigeria Tax Act\" document (26 March 2026) and a dated \"Extension of Filing Deadline\" notice (31 March 2026), both published on the official site",
+      "taxpayer_id_scheme": "KNTIN — confirmed via an \"OBTAIN TAX ID — KNTIN\" quick-action link on the homepage",
+      "api_available": false,
+      "api_documentation_url": null,
+      "applicable_laws": [
+        "Nigeria Tax Act 2025 — \"Final Approved Copy for Print\" confirmed available for download on the official site (26 June 2025)",
+        "Nigeria Tax Administration Act 2025 — \"Approved Copy to Print\" confirmed available for download (26 June 2025)",
+        "Nigeria Revenue Service (Establishment) Act 2025 — confirmed available for download (26 June 2025)",
+        "Joint Revenue Board of Nigeria (Establishment) Act 2025 — confirmed available for download (26 June 2025)",
+        "Kano State Revenues Tax Laws — confirmed available for download (11 June 2024), exact statutory text not independently opened this pass",
+        "Personal Income Tax Act — confirmed available for download (11 June 2024)",
+        "Kano State Tax and Levies Gazette — confirmed available for download (11 June 2024)",
+        "Kano State Codification Law — confirmed available for download (25 May 2022)"
+      ],
+      "filing_deadlines": "Requires regulatory verification — document titles (\"Guideline for Filing Individual Tax Returns...\", \"Extension of Filing Deadline\") confirm an active, dated filing-deadline regime exists, but the actual download links on this JS-driven downloads table could not be resolved to direct URLs during this pass, so no specific date/day-of-month figure is asserted",
+      "payment_deadlines": "Requires regulatory verification — not independently separated from filing deadlines on the public site during this pass",
+      "penalties_interest": "Requires regulatory verification",
+      "exemptions": "Requires regulatory verification",
+      "last_verified": "2026-10-07",
+      "verification_status": "FULLY_RESEARCHED",
+      "verified_by": "AI regulatory research pass — live site browsed directly via real browser automation (kirs.gov.ng: Home, Tax Matters/tax-details pages). Services list (Pay-as-you-earn, Withholding Tax, Direct Assessment, Capital Gains Tax, Stamp Duties, MDA Revenues, Vehicle License Renewal) matches the same federal-devolved tax categories found at Lagos/Enugu/FCT. Notably, KIRS also publishes a full suite of data-protection policy documents (2024 Data Protection Compliance Certificate, Data Privacy Policy, Data Collection and Processing Policy, etc.) — more extensive published data-governance documentation than any other state researched so far, though not independently reviewed for NDPA/NDPR substantive compliance as part of this pass. The downloads table is JS-rendered without resolvable <a href> targets for individual documents (confirmed via direct DOM inspection), so document TITLES and DATES are confirmed real and current, but direct PDF URLs for citation are not captured here — a genuine tooling limitation of this pass, not a claim that the documents don't exist.",
+      "source_urls": [
+        "https://kirs.gov.ng",
+        "https://kirs.gov.ng/tax-details"
+      ],
+      "other_levies_observed": [
+        "MDA Revenues",
+        "Motor Vehicle License Renewal"
+      ]
     },
     {
       "state_code": "KT",
@@ -365,9 +393,26 @@
     {
       "state_code": "OG",
       "state_name": "Ogun",
-      "revenue_authority_name": "Ogun State Internal Revenue Service",
+      "revenue_authority_name": "Ogun State Internal Revenue Service (OGIRS)",
       "official_website": "https://portal.ogetax.ogunstate.gov.ng",
-      "verification_status": "LOCATED_SECONDARY_SOURCE_UNVERIFIED"
+      "taxpayer_portal": "Confirmed live — self-service registration (\"REGISTER AS A CORPORATE\" / \"REGISTER AS AN INDIVIDUAL\") issuing a Tax Identification Number, plus a \"Verify TCC\" service",
+      "taxpayer_id_scheme": "Requires regulatory verification — registration issues a TIN, but no distinct named scheme (like Enugu's ESBN or Rivers' RivTIN) was found on the public site",
+      "api_available": false,
+      "api_documentation_url": null,
+      "applicable_laws": [
+        "Requires regulatory verification — no dedicated tax-legislation/downloads page was found on this site during this pass, unlike Kano's /tax-details or Lagos's Tax Legislation page"
+      ],
+      "filing_deadlines": "Requires regulatory verification — not found in structured, citable form on the public site during this pass",
+      "payment_deadlines": "Requires regulatory verification — not found in structured, citable form on the public site during this pass",
+      "penalties_interest": "Requires regulatory verification",
+      "exemptions": "Requires regulatory verification",
+      "last_verified": "2026-10-07",
+      "verification_status": "FULLY_RESEARCHED",
+      "verified_by": "AI regulatory research pass — live site browsed directly via real browser automation (portal.ogetax.ogunstate.gov.ng homepage). Honest observation: this site's content appears noticeably less current/maintained than Lagos/Kano/Rivers — the footer copyright reads \"Copyrights © 2021\" (not updated to the current year, unlike Kano's live-rendered clock), and the \"Core Value\" section displays apparent unedited template placeholder text (\"Rapidiously create cooperative resources rather than client-based leadership skills\"). The site is genuinely live and the registration/TCC-verification/TIN-issuance functionality is real, but no tax-legislation, rate, or deadline citations were locatable during this pass — flagged honestly rather than padded out.",
+      "source_urls": [
+        "https://portal.ogetax.ogunstate.gov.ng"
+      ],
+      "other_levies_observed": []
     },
     {
       "state_code": "ON",
@@ -400,9 +445,29 @@
     {
       "state_code": "RI",
       "state_name": "Rivers",
-      "revenue_authority_name": "Rivers State Board of Internal Revenue Service",
+      "revenue_authority_name": "Rivers State Internal Revenue Service (RSIRS)",
       "official_website": "https://riversbirs.gov.ng",
-      "verification_status": "LOCATED_SECONDARY_SOURCE_UNVERIFIED"
+      "taxpayer_portal": "RIVTAMIS / TaMiS 2.0 (Rivers State Tax Management Information System) — online registration, self-assessment, online payment, e-filing, TCC verification, WHT verification, demand-notice payment, all confirmed live on the official site",
+      "taxpayer_id_scheme": "RivTIN — confirmed: a dedicated \"Search RivTIN\" lookup feature exists on the official portal, analogous to Enugu's ESBN",
+      "api_available": false,
+      "api_documentation_url": null,
+      "applicable_laws": [
+        "Nigeria Tax Act 2025 / Nigeria Tax Administration Act 2025 (federal) — not independently re-confirmed via a direct download link on this site during this pass",
+        "Requires regulatory verification — no dedicated \"Tax Legislation\"/statutory-citation page was found on riversbirs.gov.ng during this pass (the site is primarily a payment/e-filing portal, not a legislative-reference site, unlike lirs.gov.ng or fctirs.gov.ng)"
+      ],
+      "filing_deadlines": "Requires regulatory verification — not found in structured, citable form on the public site during this pass",
+      "payment_deadlines": "Requires regulatory verification — not found in structured, citable form on the public site during this pass",
+      "penalties_interest": "Requires regulatory verification — not found in structured, citable form on the public site during this pass",
+      "exemptions": "Requires regulatory verification",
+      "last_verified": "2026-10-07",
+      "verification_status": "FULLY_RESEARCHED",
+      "verified_by": "AI regulatory research pass — live site browsed directly via real browser automation (riversbirs.gov.ng: Home, About Us, FAQs pages). Notably, the site explicitly advertises genuine e-filing (\"RIVTAMIS is packed full with great features on tax-related matters like online payments, e-filing, requests for TCCs...\") in addition to online payment — distinct from Enugu/Lagos/FCT, where no e-filing capability was found. This is a real, named self-service portal (RIVTAMIS), not merely a payment gateway integration — but no statutory rate/deadline/legislation citations were found on the public marketing/informational pages during this pass, unlike Lagos's and FCT's dedicated Tax Types/Legislation pages with direct PDF links. Revenue authority name corrected from the previously-recorded secondary-source guess (\"Rivers State Board of Internal Revenue Service\") to the name actually used on the live site (\"RSIRS\", per the Executive Chairman's title \"EXECUTIVE CHAIRMAN (RSIRS)\").",
+      "source_urls": [
+        "https://riversbirs.gov.ng",
+        "https://riversbirs.gov.ng/about-us/",
+        "https://riversbirs.gov.ng/faqs/"
+      ],
+      "other_levies_observed": []
     },
     {
       "state_code": "SO",

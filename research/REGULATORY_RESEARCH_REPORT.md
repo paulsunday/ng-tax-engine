@@ -241,11 +241,54 @@ Added after the federal pass, in response to the requirement that the platform b
 
 | Tier | Count | States |
 |---|---|---|
-| `FULLY_RESEARCHED` — live official site browsed directly, page content read | 1 | Enugu |
-| `WEBSITE_CONFIRMED` — official domain + authority name cross-checked via direct search, page content not yet read | 2 | Lagos, FCT |
-| `LOCATED_SECONDARY_SOURCE_UNVERIFIED` — URL/name sourced from a third-party 2026 tax-portal directory blog, not yet independently confirmed | 34 | All remaining states |
+| `FULLY_RESEARCHED` — live official site browsed directly, page content read | 6 | Enugu, Lagos, FCT, Kano, Rivers, Ogun |
+| `LOCATED_SECONDARY_SOURCE_UNVERIFIED` — URL/name sourced from a third-party 2026 tax-portal directory blog, not yet independently confirmed | 30 | All remaining states |
 
-Full directory: `research/state_profiles.json`. **No state other than Enugu has any rate, threshold, or deadline asserted** — every other state's levies are explicitly `"Requires regulatory verification"`. The 34 `LOCATED_SECONDARY_SOURCE_UNVERIFIED` rows are a **todo list**, not research output — each needs the same browse-the-official-site pass given to Enugu before its specific obligations can be quantified. Treat "a row exists" and "this state is supported" as different claims, per brief §33 ("a state must not be marked PRODUCTION READY merely because its website exists").
+Full directory: `research/state_profiles.json` (the authoritative, up-to-date source — this
+table is a snapshot, refer to the JSON's `last_verified`/`verification_status` fields for
+the current state). **No state other than Enugu has any rate, threshold, or deadline figure
+asserted** — every other state's specific levies are explicitly `"Requires regulatory
+verification"` even where `FULLY_RESEARCHED` (that status means the live site was genuinely
+browsed, not that every field was found — see each state's own `verified_by` note for what
+was and wasn't locatable). The 30 remaining `LOCATED_SECONDARY_SOURCE_UNVERIFIED` rows are a
+**todo list**, not research output — each needs the same browse-the-official-site pass given
+to the six above before its specific obligations can be quantified. Treat "a row exists" and
+"this state is supported" as different claims, per brief §33 ("a state must not be marked
+PRODUCTION READY merely because its website exists").
+
+### 9.1a Kano, Rivers, Ogun — fully researched 2026-10-07 (second research pass)
+
+Brief summary; full detail (source URLs, exact document titles/dates, honest gaps) lives in
+each state's own `research/state_profiles.json` entry, not duplicated here.
+
+- **Kano (KIRS)**: the richest find of this pass — a dedicated `/tax-details` page listing
+  real, dated downloadable documents including the federal 2025 Act suite, Kano's own
+  Personal Income Tax Act/Tax and Levies Gazette/Codification Law, and — notably — a dated
+  "Guideline for Filing Individual Tax Returns on the Electronic Tax Platform" (26 March
+  2026) and an "Extension of Filing Deadline" notice (31 March 2026), confirming an active
+  E-Tax platform with a real, current filing-deadline regime. TIN scheme: **KNTIN**. The
+  downloads table is JS-rendered without resolvable direct `<a href>` targets — document
+  titles/dates are confirmed real, but direct PDF URLs for citation were not captured this
+  pass (a tooling limitation, not a claim the documents don't exist).
+- **Rivers (RSIRS)**: corrected the previously-recorded secondary-source authority name
+  ("Rivers State Board of Internal Revenue Service" → the name actually used on-site,
+  "RSIRS"). The site (RIVTAMIS/TaMiS 2.0) explicitly advertises genuine **e-filing**
+  alongside online payment — distinct from Enugu/Lagos/FCT/Kano, where only payment (not
+  filing) capability was confirmed. TIN scheme: **RivTIN**. No statutory rate/deadline/
+  legislation citations were found on the public marketing pages, unlike Kano's downloads
+  page or Lagos's Tax Legislation page.
+- **Ogun (OGIRS)**: confirmed live with real registration/TIN-issuance/TCC-verification
+  functionality, but notably thinner and less current than the other five — the footer
+  reads "Copyrights © 2021" and part of the page content is apparent unedited template
+  placeholder text. No tax-legislation or deadline citations were locatable. Flagged
+  honestly as the weakest of the six `FULLY_RESEARCHED` states, not padded to look otherwise.
+
+None of the three found a documented, programmatic e-filing API — Rivers' and Kano's
+"e-filing"/"Electronic Tax Platform" are web-portal self-service systems a human must use
+directly, the same `MANUAL_OFFICIAL_PORTAL` classification as every other state so far
+(see `src/adapters/AdapterRegistry.ts` — no dedicated adapter was built for these three,
+since no API exists to integrate against; they use the generic `ManualFilingAdapter`,
+correctly labelled with the now-corrected/confirmed authority names from this pass).
 
 ### 9.2 Enugu — fully researched (brief §8-9)
 
@@ -269,9 +312,15 @@ Source: direct browse of `https://irs.en.gov.ng` (Tax Systems, Tax Legislation, 
 
 ### 9.5 Open items — state layer
 
-1. Full browse-the-official-site research pass for the remaining 35 states/FCT (Lagos and FCT have only a confirmed URL/name so far; the other 34 are secondary-sourced URLs needing independent confirmation).
+1. Full browse-the-official-site research pass for the remaining 30 states (Enugu, Lagos,
+   FCT, Kano, Rivers, and Ogun are now `FULLY_RESEARCHED`; the other 30 are still
+   secondary-sourced URLs needing independent confirmation).
 2. Verify Enugu's Land Use Charge rate schedule against the actual Law No. 7 of 2016 text (not yet located as a directly fetchable document).
 3. Verify Enugu's WHT sub-rates (10%/5% as displayed on the Tax Systems page) against the Financial Law text itself, since the site lists them as labels rather than a cited schedule.
 4. Determine, for PAYE jurisdiction generally, whether current law ever turns on an employee's **work** state rather than **residence** state (the engine currently assumes residence, consistent with historical PITA practice, and flags any work/residence mismatch for professional review rather than asserting an answer).
 5. Upgrade `monitoring/monitor.py` to a headless-browser fetch before relying on it for any state portal's content.
-6. Determine whether any state (or the NRS/JRB) has published a real, documented e-filing API — none was found for Enugu, Lagos, or FCT in this pass, and none was assumed for the remaining 34.
+6. Determine whether any state (or the NRS/JRB) has published a real, documented,
+   *programmatic* e-filing API — none was found for any of the six `FULLY_RESEARCHED`
+   states (Enugu, Lagos, FCT, Kano, Rivers, Ogun); Rivers and Kano both confirm web-portal
+   e-filing (a human using a browser), which is a genuine capability but not an API this
+   platform could integrate against — see §9.1a.

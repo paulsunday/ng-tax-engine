@@ -98,6 +98,33 @@ describe("multi-state jurisdiction matrix (brief §35-36)", () => {
     expect(Object.keys(grouped)).toContain("Federal Capital Territory");
   });
 
+  test("Kano/Rivers/Ogun (FULLY_RESEARCHED 2026-10-07, second pass) resolve without crashing and report their own authority names", () => {
+    const multiState2: MultiStateCompanyInput = {
+      id: "netwave-2",
+      name: "Second Pass Co",
+      headOfficeStateCode: "RI",
+      branches: [
+        { id: "br-kano", label: "Kano Branch", stateCode: "KN", hasBusinessPremises: true },
+        { id: "br-ogun", label: "Ogun Branch", stateCode: "OG", hasBusinessPremises: true },
+      ],
+      employees: [],
+    };
+    // Regression test: other_levies_observed must be an array (jurisdiction.ts calls
+    // .join(", ") on it) — an earlier pass briefly recorded it as a plain string for these
+    // three states, which would throw a TypeError the instant any of them was touched.
+    // This test exercises exactly that code path for real, not just via JSON validation.
+    const matrix2 = buildJurisdictionMatrix(multiState2, federalApplicability, stateAuthorities);
+    const stateRows = matrix2.filter((m) => m.jurisdictionLevel === "STATE");
+    expect(stateRows.length).toBeGreaterThan(0);
+
+    const rivers = stateRows.find((m) => m.stateCode === "RI");
+    expect(rivers!.reason).toMatch(/Rivers State Internal Revenue Service \(RSIRS\)/);
+    const kano = stateRows.find((m) => m.stateCode === "KN");
+    expect(kano!.reason).toMatch(/Kano State Internal Revenue Service \(KIRS\)/);
+    const ogun = stateRows.find((m) => m.stateCode === "OG");
+    expect(ogun!.reason).toMatch(/Ogun State Internal Revenue Service \(OGIRS\)/);
+  });
+
   test("a state with no directory entry at all produces a MISSING_REGULATORY_INFORMATION row, never a crash or silent skip", () => {
     const companyInGhostState: MultiStateCompanyInput = {
       ...multiState,
