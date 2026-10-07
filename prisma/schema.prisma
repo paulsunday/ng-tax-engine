@@ -58,6 +58,11 @@ model User {
   // token. Single-use: both fields are cleared the moment a reset succeeds.
   passwordResetTokenHash  String?
   passwordResetExpiresAt  DateTime?
+  // NDPA/NDPR erasure request (docs/DATA_RETENTION_AND_ERASURE_POLICY.md). Anonymize-in-
+  // place, never a hard delete — AuditLog/OrganizationUser rows referencing this user must
+  // survive for statutory/audit-immutability reasons, so erasure scrubs this row's own
+  // personal fields (fullName, email) and deactivates the account rather than removing it.
+  erasedAt        DateTime?
   createdAt       DateTime @default(now())
 
   memberships     OrganizationUser[]

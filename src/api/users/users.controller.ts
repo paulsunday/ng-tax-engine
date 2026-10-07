@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { IsBoolean } from "class-validator";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
@@ -18,6 +18,18 @@ export class UsersController {
   @Get("me")
   async getMine(@CurrentUser() user: JwtPayload) {
     return this.users.getProfile(user.sub);
+  }
+
+  /** NDPA/NDPR right of access — see UsersService.exportMyData for exact scope. */
+  @Get("me/export-data")
+  async exportMyData(@CurrentUser() user: JwtPayload) {
+    return this.users.exportMyData(user.sub);
+  }
+
+  /** NDPA/NDPR right to erasure — see UsersService.requestErasure for exact scope (anonymize, not hard-delete). */
+  @Post("me/request-erasure")
+  async requestErasure(@CurrentUser() user: JwtPayload) {
+    return this.users.requestErasure(user.sub);
   }
 
   @Patch(":userId/tax-rule-approver")
