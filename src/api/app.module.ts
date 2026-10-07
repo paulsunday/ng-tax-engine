@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { RequestLoggingMiddleware } from "./common/middleware/request-logging.middleware";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerGuard, ThrottlerModule, seconds } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -84,4 +85,8 @@ import { TaxRuleGovernanceModule } from "./tax-rule-governance/tax-rule-governan
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggingMiddleware).forRoutes("*");
+  }
+}
