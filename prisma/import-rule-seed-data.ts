@@ -92,11 +92,13 @@ async function main() {
     const taxType = rule.tax_type as any;
     const jurisdiction = toPrismaJurisdiction(rule.jurisdiction);
 
-    const taxRule = await prisma.taxRule.upsert({
-      where: { ruleKey_taxType_jurisdiction_stateCode: { ruleKey: rule.rule_key, taxType, jurisdiction, stateCode: null as any } },
-      update: {},
-      create: { ruleKey: rule.rule_key, taxType, jurisdiction, description: rule.description },
-    });
+    // Prisma's compound-unique `where` rejects a literal null for a nullable key field —
+    // every seed rule here is federal/non-state-specific (stateCode always null), so this
+    // is always the findFirst+create path, never the upsert-by-compound-key one.
+    let taxRule = await prisma.taxRule.findFirst({ where: { ruleKey: rule.rule_key, taxType, jurisdiction, stateCode: null } });
+    if (!taxRule) {
+      taxRule = await prisma.taxRule.create({ data: { ruleKey: rule.rule_key, taxType, jurisdiction, description: rule.description } });
+    }
 
     const existingVersion = await prisma.taxRuleVersion.findFirst({
       where: { taxRuleId: taxRule.id, ruleVersion: rule.rule_version },

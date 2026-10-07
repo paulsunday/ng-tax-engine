@@ -31,7 +31,7 @@ function makeMocks() {
       update: jest.fn(),
       upsert: jest.fn(),
     },
-    taxRule: { upsert: jest.fn() },
+    taxRule: { upsert: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
     taxRuleSource: { findUnique: jest.fn(), create: jest.fn() },
     taxRuleReview: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
     taxRuleApproval: { create: jest.fn(), findMany: jest.fn() },
@@ -252,6 +252,58 @@ describe("TaxRuleGovernanceService — create() and supersede()", () => {
         sourceReference: "s.1",
       } as any)
     ).rejects.toThrow(/must cite a source/);
+  });
+
+  test("create() for a federal (stateCode-less) rule uses findFirst+create, never a null compound-unique lookup", async () => {
+    const { service, prisma } = makeMocks();
+    prisma.taxRuleSource.create.mockResolvedValue({ id: "src-1" });
+    prisma.taxRule.findFirst.mockResolvedValue(null);
+    prisma.taxRule.create.mockResolvedValue({ id: "rule-1" });
+    prisma.taxRuleVersion.create.mockResolvedValue({ id: "ver-1" });
+
+    await service.create("u1", {
+      ruleKey: "cit_standard_rate",
+      taxType: "CIT",
+      jurisdiction: "NG_FEDERAL",
+      description: "Standard CIT rate",
+      ruleVersion: "1.0",
+      value: 0.3,
+      effectiveFrom: "2026-01-01",
+      sourceReference: "s.56",
+      sourceTitle: "Nigeria Tax Act, 2025",
+      sourceUrl: "https://example.com/nta2025",
+    } as any);
+
+    expect(prisma.taxRule.upsert).not.toHaveBeenCalled();
+    expect(prisma.taxRule.findFirst).toHaveBeenCalledWith({ where: { ruleKey: "cit_standard_rate", taxType: "CIT", jurisdiction: "NG_FEDERAL", stateCode: null } });
+    expect(prisma.taxRule.create).toHaveBeenCalled();
+    expect(prisma.taxRuleVersion.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ taxRuleId: "rule-1", status: "DRAFT" }) }));
+  });
+
+  test("create() for a state-specific rule reuses an existing TaxRule via the compound-unique upsert", async () => {
+    const { service, prisma } = makeMocks();
+    prisma.taxRuleSource.create.mockResolvedValue({ id: "src-1" });
+    prisma.taxRule.upsert.mockResolvedValue({ id: "rule-en-1" });
+    prisma.taxRuleVersion.create.mockResolvedValue({ id: "ver-1" });
+
+    await service.create("u1", {
+      ruleKey: "enugu_levy",
+      taxType: "STATE_LEVY",
+      jurisdiction: "NG_STATE",
+      stateCode: "EN",
+      description: "Enugu state levy",
+      ruleVersion: "1.0",
+      value: 5000,
+      effectiveFrom: "2026-01-01",
+      sourceReference: "s.1",
+      sourceTitle: "Enugu State Revenue Law",
+      sourceUrl: "https://example.com/enugu-law",
+    } as any);
+
+    expect(prisma.taxRule.findFirst).not.toHaveBeenCalled();
+    expect(prisma.taxRule.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ruleKey_taxType_jurisdiction_stateCode: { ruleKey: "enugu_levy", taxType: "STATE_LEVY", jurisdiction: "NG_STATE", stateCode: "EN" } } })
+    );
   });
 
   test("supersede() links the new DRAFT version to the existing one via supersedesId", async () => {

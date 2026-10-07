@@ -122,25 +122,7 @@ export class TaxRuleGovernanceService {
 
   async create(userId: string, dto: CreateRuleDto) {
     const source = await this.resolveSource(dto);
-
-    const taxRule = await this.prisma.taxRule.upsert({
-      where: {
-        ruleKey_taxType_jurisdiction_stateCode: {
-          ruleKey: dto.ruleKey,
-          taxType: dto.taxType as any,
-          jurisdiction: dto.jurisdiction as any,
-          stateCode: dto.stateCode ?? (null as any),
-        },
-      },
-      update: {},
-      create: {
-        ruleKey: dto.ruleKey,
-        taxType: dto.taxType as any,
-        jurisdiction: dto.jurisdiction as any,
-        stateCode: dto.stateCode,
-        description: dto.description,
-      },
-    });
+    const taxRule = await this.findOrCreateTaxRule(dto.ruleKey, dto.taxType, dto.jurisdiction, dto.stateCode, dto.description);
 
     const version = await this.prisma.taxRuleVersion.create({
       data: {
@@ -166,6 +148,26 @@ export class TaxRuleGovernanceService {
 
     await this.recordHistory({ ruleVersionId: version.id, action: "CREATED", performedById: userId, newStatus: "DRAFT" });
     return version;
+  }
+
+  /**
+   * Prisma's compound-unique `where` helper rejects a literal `null` for a nullable key
+   * field outright ("Argument stateCode must not be null") — SQL NULL is never equal to
+   * NULL, so "the uniquely identified row" is meaningless when the key itself is null.
+   * Federal/non-state rules have stateCode = null, so upsert-by-compound-key only works
+   * for state-specific rules; everything else needs a plain findFirst + conditional create.
+   */
+  private async findOrCreateTaxRule(ruleKey: string, taxType: string, jurisdiction: string, stateCode: string | undefined, description: string) {
+    if (stateCode) {
+      return this.prisma.taxRule.upsert({
+        where: { ruleKey_taxType_jurisdiction_stateCode: { ruleKey, taxType: taxType as any, jurisdiction: jurisdiction as any, stateCode } },
+        update: {},
+        create: { ruleKey, taxType: taxType as any, jurisdiction: jurisdiction as any, stateCode, description },
+      });
+    }
+    const existing = await this.prisma.taxRule.findFirst({ where: { ruleKey, taxType: taxType as any, jurisdiction: jurisdiction as any, stateCode: null } });
+    if (existing) return existing;
+    return this.prisma.taxRule.create({ data: { ruleKey, taxType: taxType as any, jurisdiction: jurisdiction as any, description } });
   }
 
   private async resolveSource(dto: { sourceId?: string; sourceTitle?: string; sourceIssuingAuthority?: string; sourceTier?: number; sourceUrl?: string }) {
