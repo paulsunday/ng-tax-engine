@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
+import { CompanySubNav } from "@/components/CompanySubNav";
 
 interface Company {
   id: string;
@@ -66,6 +67,8 @@ function CompanyDetail() {
           </p>
         </div>
       )}
+
+      <CompanySubNav companyId={companyId} active="Overview" />
 
       <RunCalculationForm companyId={companyId} onComputed={reload} />
 

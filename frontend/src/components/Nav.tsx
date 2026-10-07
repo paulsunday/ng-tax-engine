@@ -13,11 +13,14 @@ export function Nav() {
           NG Tax Engine
         </Link>
         {claims?.organizationId && (
-          <>
-            <Link href="/" className="text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">
-              Companies
-            </Link>
-          </>
+          <Link href="/" className="text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">
+            Companies
+          </Link>
+        )}
+        {(claims?.isPlatformAdmin || claims?.isTaxRuleApprover) && (
+          <Link href="/admin/tax-rules" className="text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">
+            Tax Rules
+          </Link>
         )}
       </div>
       <div className="flex items-center gap-4 text-sm">
@@ -32,6 +35,9 @@ export function Nav() {
                 Select organization
               </Link>
             )}
+            <Link href="/settings" className="text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">
+              Settings
+            </Link>
             <button onClick={logout} className="text-red-600 hover:underline">
               Log out
             </button>

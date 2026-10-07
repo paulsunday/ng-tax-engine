@@ -83,13 +83,16 @@ function CreateCompanyForm({ onCreated }: { onCreated: () => void }) {
     setError(null);
     setIsSubmitting(true);
     try {
-      await api.post("/companies", {
+      const company = await api.post<{ id: string }>("/companies", {
         name,
         headOfficeStateCode: headOfficeStateCode.toUpperCase(),
         incorporationDate,
         accountingYearEnd,
         ...(tin ? { tin } : {}),
       });
+      // Seed the starter chart of accounts immediately — expenses/invoices need accounts
+      // to post against, and there's no reason to make every new company do this by hand.
+      await api.post(`/companies/${company.id}/accounts/seed-defaults`);
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create company.");
