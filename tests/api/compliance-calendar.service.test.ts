@@ -46,7 +46,7 @@ describe("ComplianceCalendarService.createForReturn", () => {
     const { prisma, companies, auditLog, rules } = makeMocks();
     prisma.taxReturn.findUnique.mockResolvedValue({ id: "ret-1", companyId: "company-1", taxType: "VAT", periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-06-30"), taxLiabilityNgn: "1000" });
     rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("vat_filing_deadline_rule", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("vat_filing_deadline_rule", "VERIFIED");
     });
     const service = new ComplianceCalendarService(prisma, companies, auditLog, rules);
 

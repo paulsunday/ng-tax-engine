@@ -44,7 +44,7 @@ describe("TaxCalculationService.computeCitAndDevelopmentLevy", () => {
     const m = makeMocks();
     m.statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 500_000, totalRevenueNgn: 1_000_000 });
     m.rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     m.prisma.taxReturn.findFirst.mockResolvedValue({ id: "existing-return" });
 
@@ -56,7 +56,7 @@ describe("TaxCalculationService.computeCitAndDevelopmentLevy", () => {
     const m = makeMocks();
     m.statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 500_000, totalRevenueNgn: 1_000_000 });
     m.rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     m.prisma.taxReturn.create.mockImplementation(async ({ data }: any) => ({ id: "ret-1", ...data }));
 
@@ -73,7 +73,7 @@ describe("TaxCalculationService.computeCitAndDevelopmentLevy", () => {
     m.statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 500_000, totalRevenueNgn: 1_000_000 });
     m.capitalAllowance.getTotalClaimedForYear.mockResolvedValue(100_000); // reduces taxable profit but NOT the levy base
     m.rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("x", "DRAFT_VERIFIED"); // force the guarded path, but we only care about what PROFIT was passed in
+      throw new UnverifiedRuleError("x", "VERIFIED"); // force the guarded path, but we only care about what PROFIT was passed in
     });
     let capturedLevyProfit: number | undefined;
     const originalCreate = m.prisma.taxReturn.create;
@@ -98,7 +98,7 @@ describe("TaxCalculationService.computeVatReturn", () => {
     m.prisma.expense.findMany.mockResolvedValue([{ vatAmountNgn: "3000" }]);
     m.statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 0, totalRevenueNgn: 150_000 });
     m.rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("vat_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("vat_standard_rate", "VERIFIED");
     });
     m.prisma.taxReturn.create.mockImplementation(async ({ data }: any) => ({ id: "ret-1", ...data }));
 

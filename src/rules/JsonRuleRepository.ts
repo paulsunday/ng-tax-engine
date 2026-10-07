@@ -75,18 +75,19 @@ export class JsonRuleRepository extends BaseRuleRepository {
   }
 
   /**
-   * Returns a new repository where DRAFT_VERIFIED rules are promoted to ACTIVE.
+   * Returns a new repository where VERIFIED rules are promoted to ACTIVE.
    *
    * THIS SIMULATES THE §42 TAX-PROFESSIONAL-APPROVAL STEP AND MUST NEVER BE USED AGAINST
    * REAL TAXPAYER DATA. It exists solely so automated tests and the acceptance demo can
    * exercise the calculation engines end-to-end without a live approval workflow attached.
-   * REQUIRES_REVIEW rules are intentionally left untouched — even this demo shortcut
-   * refuses to activate a rule whose source was never confirmed.
+   * RESEARCHED rules (source attached but figure itself unconfirmed/ambiguous) are
+   * intentionally left untouched — even this demo shortcut refuses to activate a rule
+   * whose source was never confirmed.
    */
   withSimulatedDemoApproval(approverLabel = "DEMO HARNESS — NOT a real tax professional approval"): JsonRuleRepository {
     const clone = Object.create(JsonRuleRepository.prototype) as JsonRuleRepository;
     clone.rules = this.rules.map((r) =>
-      r.status === "DRAFT_VERIFIED"
+      r.status === "VERIFIED"
         ? { ...r, status: "ACTIVE" as RuleStatus, verifiedBy: `${r.verifiedBy} | promoted by: ${approverLabel}` }
         : r
     );

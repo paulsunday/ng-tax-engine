@@ -33,7 +33,7 @@ describe("ScenariosService.generate — NORMAL", () => {
     const { prisma, companies, statements, auditLog, rules } = makeMocks();
     statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 500_000 });
     rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     prisma.scenario.create.mockResolvedValue({ id: "scn-1" });
     prisma.scenario.findUnique.mockResolvedValue({ id: "scn-1", companyId: "company-1", accountingProfitNgn: "500000", adjustments: [] });
@@ -51,7 +51,7 @@ describe("ScenariosService.generate — tax-engine governance integration", () =
     const { prisma, companies, statements, auditLog, rules } = makeMocks();
     statements.getProfitAndLoss.mockResolvedValue({ netProfitBeforeTaxNgn: 500_000 });
     rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     prisma.scenario.create.mockResolvedValue({ id: "scn-1" });
     prisma.scenario.findUnique.mockResolvedValue({ id: "scn-1", companyId: "company-1" });
@@ -73,7 +73,7 @@ describe("ScenariosService.generate — PROFIT_SCENARIO", () => {
       { id: "inv-draft-1", invoiceNumber: "INV-9", subtotalNgn: "150000", customer: { name: "Beta Ltd" } },
     ]);
     rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     prisma.scenario.create.mockResolvedValue({ id: "scn-2" });
     prisma.scenario.findUnique.mockResolvedValue({ id: "scn-2", companyId: "company-1" });
@@ -100,7 +100,7 @@ describe("ScenariosService.generate — LOSS_SCENARIO", () => {
       { id: "exp-draft-1", description: "Unposted repair bill", subtotalNgn: "80000", supplier: { name: "FixIt Ltd" } },
     ]);
     rules.getEffectiveRule.mockImplementation(() => {
-      throw new UnverifiedRuleError("cit_standard_rate", "DRAFT_VERIFIED");
+      throw new UnverifiedRuleError("cit_standard_rate", "VERIFIED");
     });
     prisma.scenario.create.mockResolvedValue({ id: "scn-3" });
     prisma.scenario.findUnique.mockResolvedValue({ id: "scn-3", companyId: "company-1" });

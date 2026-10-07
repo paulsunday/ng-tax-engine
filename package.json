@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed:rbac": "ts-node -r reflect-metadata prisma/seed-rbac.ts",
+    "import:rule-seed-data": "ts-node -r reflect-metadata prisma/import-rule-seed-data.ts",
     "start:api": "ts-node -r reflect-metadata src/api/main.ts",
     "start:api:dev": "ts-node-dev -r reflect-metadata --respawn src/api/main.ts",
     "start": "prisma migrate deploy && node dist/prisma/seed-rbac.js && node dist/src/api/main.js"

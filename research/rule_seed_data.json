@@ -16,16 +16,18 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "cit_standard_rate",
       "description": "Standard Companies Income Tax rate on total profits",
-      "value": 0.30,
+      "value": 0.3,
       "value_type": "percentage",
-      "conditions": { "company_classification": "standard" },
+      "conditions": {
+        "company_classification": "standard"
+      },
       "effective_from": "2026-01-01",
       "effective_to": null,
       "source_document": "Nigeria Tax Act, 2025 (Act No. 7 of 2025)",
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 56(1)(b)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -35,16 +37,18 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "cit_small_company_rate",
       "description": "CIT rate for companies meeting the small-company definition",
-      "value": 0.0,
+      "value": 0,
       "value_type": "percentage",
-      "conditions": { "company_classification": "small_company" },
+      "conditions": {
+        "company_classification": "small_company"
+      },
       "effective_from": "2026-01-01",
       "effective_to": null,
       "source_document": "Nigeria Tax Act, 2025",
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 56(1)(a)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -54,7 +58,11 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "small_company_threshold",
       "description": "Turnover and fixed-asset thresholds defining a 'small company'; professional-services businesses are excluded from this classification regardless of turnover",
-      "value": { "max_turnover_ngn": 50000000, "max_fixed_assets_ngn": 250000000, "excludes_professional_services": true },
+      "value": {
+        "max_turnover_ngn": 50000000,
+        "max_fixed_assets_ngn": 250000000,
+        "excludes_professional_services": true
+      },
       "value_type": "object",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -62,7 +70,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 56, interpretation clause",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -73,12 +81,27 @@
       "rule_key": "cit_filing_deadline_rule",
       "description": "Annual self-assessment filing deadline",
       "value": {
-        "established_company": { "basis": "months_after_period_end", "months": 6 },
-        "newly_incorporated": { "basis": "earlier_of", "options": [
-          { "basis": "months_after_incorporation", "months": 18 },
-          { "basis": "months_after_period_end", "months": 6 }
-        ] },
-        "ceasing_company": { "basis": "months_after_event", "months": 6 }
+        "established_company": {
+          "basis": "months_after_period_end",
+          "months": 6
+        },
+        "newly_incorporated": {
+          "basis": "earlier_of",
+          "options": [
+            {
+              "basis": "months_after_incorporation",
+              "months": 18
+            },
+            {
+              "basis": "months_after_period_end",
+              "months": 6
+            }
+          ]
+        },
+        "ceasing_company": {
+          "basis": "months_after_event",
+          "months": 6
+        }
       },
       "value_type": "deadline_rule",
       "effective_from": "2026-01-01",
@@ -87,7 +110,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 11(5)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -99,14 +122,19 @@
       "description": "Development Levy on assessable profits of all companies except small companies and non-resident companies",
       "value": 0.04,
       "value_type": "percentage",
-      "conditions": { "excludes": ["small_company", "non_resident_company"] },
+      "conditions": {
+        "excludes": [
+          "small_company",
+          "non_resident_company"
+        ]
+      },
       "effective_from": "2026-01-01",
       "effective_to": null,
       "source_document": "Nigeria Tax Act, 2025",
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 59(1)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -124,7 +152,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 148",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -134,7 +162,11 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "vat_filing_deadline_rule",
       "description": "Monthly VAT return due on/before 21st of the following month; filing extension does not extend payment deadline",
-      "value": { "basis": "fixed_day_of_following_month", "dayOfMonth": 21, "filing_extension_extends_payment": false },
+      "value": {
+        "basis": "fixed_day_of_following_month",
+        "dayOfMonth": 21,
+        "filing_extension_extends_payment": false
+      },
       "value_type": "deadline_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -142,7 +174,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 22(1)-(2)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -160,7 +192,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 22(4)-(7)",
       "rule_version": "0.1-draft",
-      "status": "REQUIRES_REVIEW",
+      "status": "RESEARCHED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — numeric threshold NOT confirmed, see report §8 item 1"
     },
@@ -171,22 +203,54 @@
       "rule_key": "paye_tax_bands",
       "description": "Progressive individual income tax bands (Fourth Schedule), applied after relief allowance/exemptions under s.30",
       "value": [
-        { "band_order": 1, "amount_ngn": 800000, "type": "first", "rate": 0.0 },
-        { "band_order": 2, "amount_ngn": 2200000, "type": "next", "rate": 0.15 },
-        { "band_order": 3, "amount_ngn": 9000000, "type": "next", "rate": 0.18 },
-        { "band_order": 4, "amount_ngn": 13000000, "type": "next", "rate": 0.21 },
-        { "band_order": 5, "amount_ngn": 25000000, "type": "next", "rate": 0.23 },
-        { "band_order": 6, "amount_ngn": null, "type": "above_cumulative_50000000", "rate": 0.25 }
+        {
+          "band_order": 1,
+          "amount_ngn": 800000,
+          "type": "first",
+          "rate": 0
+        },
+        {
+          "band_order": 2,
+          "amount_ngn": 2200000,
+          "type": "next",
+          "rate": 0.15
+        },
+        {
+          "band_order": 3,
+          "amount_ngn": 9000000,
+          "type": "next",
+          "rate": 0.18
+        },
+        {
+          "band_order": 4,
+          "amount_ngn": 13000000,
+          "type": "next",
+          "rate": 0.21
+        },
+        {
+          "band_order": 5,
+          "amount_ngn": 25000000,
+          "type": "next",
+          "rate": 0.23
+        },
+        {
+          "band_order": 6,
+          "amount_ngn": null,
+          "type": "above_cumulative_50000000",
+          "rate": 0.25
+        }
       ],
       "value_type": "progressive_bands",
-      "conditions": { "excludes": "individuals earning statutory minimum wage" },
+      "conditions": {
+        "excludes": "individuals earning statutory minimum wage"
+      },
       "effective_from": "2026-01-01",
       "effective_to": null,
       "source_document": "Nigeria Tax Act, 2025",
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Fourth Schedule, Section 58(1)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -196,7 +260,11 @@
       "jurisdiction": "NG-STATE",
       "rule_key": "rent_relief",
       "description": "Rent relief deduction replacing the old Consolidated Relief Allowance",
-      "value": { "percentage_of_annual_rent": 0.20, "cap_ngn": 500000, "apply": "lower_of" },
+      "value": {
+        "percentage_of_annual_rent": 0.2,
+        "cap_ngn": 500000,
+        "apply": "lower_of"
+      },
       "value_type": "object",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -204,7 +272,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 30(2)(a)(vi)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -214,7 +282,10 @@
       "jurisdiction": "NG-STATE",
       "rule_key": "paye_annual_employer_return_deadline",
       "description": "Employer annual PAYE return for all employee emoluments in the preceding year",
-      "value": { "basis": "fixed_date", "fixed_date": "01-31" },
+      "value": {
+        "basis": "fixed_date",
+        "fixed_date": "01-31"
+      },
       "value_type": "deadline_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -222,7 +293,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 14(1)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -240,7 +311,7 @@
       "source_url": null,
       "source_reference": null,
       "rule_version": "0.1-draft",
-      "status": "REQUIRES_REVIEW",
+      "status": "RESEARCHED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — NOT confirmed, see report §8 item 3"
     },
@@ -251,30 +322,118 @@
       "rule_key": "wht_rate_table",
       "description": "Withholding tax rates by transaction category and recipient type (First Schedule)",
       "value": [
-        { "transaction": "dividend_interest", "resident_corporate": 0.10, "nonresident_corporate": 0.10, "resident_noncorporate": 0.10, "nonresident_noncorporate": 0.10 },
-        { "transaction": "royalty", "resident_corporate": 0.10, "nonresident_corporate": 0.10, "resident_noncorporate": 0.05, "nonresident_noncorporate": 0.05 },
-        { "transaction": "rent_hire_lease", "resident_corporate": 0.10, "nonresident_corporate": 0.10, "resident_noncorporate": 0.10, "nonresident_noncorporate": 0.10 },
-        { "transaction": "commission_consultancy_technical_management_professional_fees", "resident_corporate": 0.05, "nonresident_corporate": 0.10, "resident_noncorporate": 0.05, "nonresident_noncorporate": 0.10 },
-        { "transaction": "supply_of_goods_or_materials_non_manufacturer", "resident_corporate": 0.02, "nonresident_corporate": null, "resident_noncorporate": 0.02, "nonresident_noncorporate": null },
-        { "transaction": "colocation_telecom_tower_services", "resident_corporate": 0.02, "nonresident_corporate": 0.05, "resident_noncorporate": 0.02, "nonresident_noncorporate": 0.05 },
-        { "transaction": "supply_or_rendering_of_services_other", "resident_corporate": 0.02, "nonresident_corporate": 0.05, "resident_noncorporate": 0.02, "nonresident_noncorporate": 0.05 },
-        { "transaction": "construction_roads_bridges_buildings_powerplants", "resident_corporate": 0.02, "nonresident_corporate": 0.05, "resident_noncorporate": 0.02, "nonresident_noncorporate": 0.05 },
-        { "transaction": "other_construction_and_related", "resident_corporate": 0.05, "nonresident_corporate": 0.10, "resident_noncorporate": 0.05, "nonresident_noncorporate": 0.10 },
-        { "transaction": "brokerage_fee", "resident_corporate": 0.05, "nonresident_corporate": 0.10, "resident_noncorporate": 0.05, "nonresident_noncorporate": 0.10 },
-        { "transaction": "directors_fees", "resident_corporate": null, "nonresident_corporate": null, "resident_noncorporate": 0.15, "nonresident_noncorporate": 0.20 },
-        { "transaction": "compensation_for_loss_of_employment", "resident_corporate": null, "nonresident_corporate": null, "resident_noncorporate": 0.10, "nonresident_noncorporate": 0.10 },
-        { "transaction": "entertainers_sportspersons_nigeria_sourced", "resident_corporate": null, "nonresident_corporate": 0.15, "resident_noncorporate": null, "nonresident_noncorporate": 0.15 },
-        { "transaction": "lottery_gaming_reality_show_winnings", "resident_corporate": null, "nonresident_corporate": null, "resident_noncorporate": 0.05, "nonresident_noncorporate": 0.15, "effective_from": "2025-01-01" }
+        {
+          "transaction": "dividend_interest",
+          "resident_corporate": 0.1,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.1,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "royalty",
+          "resident_corporate": 0.1,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.05,
+          "nonresident_noncorporate": 0.05
+        },
+        {
+          "transaction": "rent_hire_lease",
+          "resident_corporate": 0.1,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.1,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "commission_consultancy_technical_management_professional_fees",
+          "resident_corporate": 0.05,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.05,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "supply_of_goods_or_materials_non_manufacturer",
+          "resident_corporate": 0.02,
+          "nonresident_corporate": null,
+          "resident_noncorporate": 0.02,
+          "nonresident_noncorporate": null
+        },
+        {
+          "transaction": "colocation_telecom_tower_services",
+          "resident_corporate": 0.02,
+          "nonresident_corporate": 0.05,
+          "resident_noncorporate": 0.02,
+          "nonresident_noncorporate": 0.05
+        },
+        {
+          "transaction": "supply_or_rendering_of_services_other",
+          "resident_corporate": 0.02,
+          "nonresident_corporate": 0.05,
+          "resident_noncorporate": 0.02,
+          "nonresident_noncorporate": 0.05
+        },
+        {
+          "transaction": "construction_roads_bridges_buildings_powerplants",
+          "resident_corporate": 0.02,
+          "nonresident_corporate": 0.05,
+          "resident_noncorporate": 0.02,
+          "nonresident_noncorporate": 0.05
+        },
+        {
+          "transaction": "other_construction_and_related",
+          "resident_corporate": 0.05,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.05,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "brokerage_fee",
+          "resident_corporate": 0.05,
+          "nonresident_corporate": 0.1,
+          "resident_noncorporate": 0.05,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "directors_fees",
+          "resident_corporate": null,
+          "nonresident_corporate": null,
+          "resident_noncorporate": 0.15,
+          "nonresident_noncorporate": 0.2
+        },
+        {
+          "transaction": "compensation_for_loss_of_employment",
+          "resident_corporate": null,
+          "nonresident_corporate": null,
+          "resident_noncorporate": 0.1,
+          "nonresident_noncorporate": 0.1
+        },
+        {
+          "transaction": "entertainers_sportspersons_nigeria_sourced",
+          "resident_corporate": null,
+          "nonresident_corporate": 0.15,
+          "resident_noncorporate": null,
+          "nonresident_noncorporate": 0.15
+        },
+        {
+          "transaction": "lottery_gaming_reality_show_winnings",
+          "resident_corporate": null,
+          "nonresident_corporate": null,
+          "resident_noncorporate": 0.05,
+          "nonresident_noncorporate": 0.15,
+          "effective_from": "2025-01-01"
+        }
       ],
       "value_type": "rate_table",
-      "conditions": { "no_tin_recipient": "rate doubles for non-passive-income transactions (goods/services)", "treaty_override": "ratified DTT rate applies if lower, for treaty-resident recipients" },
+      "conditions": {
+        "no_tin_recipient": "rate doubles for non-passive-income transactions (goods/services)",
+        "treaty_override": "ratified DTT rate applies if lower, for treaty-resident recipients"
+      },
       "effective_from": "2025-01-01",
       "effective_to": null,
       "source_document": "Deduction of Tax at Source (Withholding) Regulations, 2024 (S.I. No. 34 of 2024)",
       "source_url": "https://capacityhub.org/Uploads/Workshop2/Deduction%20of%20Tax%20at%20Source%20(Withholding)%20Regulatio.pdf",
       "source_reference": "First Schedule, Regulation 3(a); doubling rule Regulation 3(c); treaty override Regulation 3(b)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -284,7 +443,11 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "wht_small_supplier_exemption",
       "description": "Small-company suppliers (as defined under s.105 of the now-repealed CITA) with a valid TIN are exempt from suffering WHT deduction where the transaction value is <= NGN 2,000,000 in the relevant calendar month. Mapping of 'small company' definition to NTA s.56 post-2026 is unconfirmed.",
-      "value": { "max_transaction_value_ngn_per_month": 2000000, "requires_valid_tin": true, "definition_source": "old CITA s.105 — mapping to NTA s.56 unconfirmed" },
+      "value": {
+        "max_transaction_value_ngn_per_month": 2000000,
+        "requires_valid_tin": true,
+        "definition_source": "old CITA s.105 — mapping to NTA s.56 unconfirmed"
+      },
       "value_type": "object",
       "effective_from": "2025-01-01",
       "effective_to": null,
@@ -292,7 +455,7 @@
       "source_url": "https://capacityhub.org/Uploads/Workshop2/Deduction%20of%20Tax%20at%20Source%20(Withholding)%20Regulatio.pdf",
       "source_reference": "Regulation 4(2)",
       "rule_version": "0.9-draft",
-      "status": "REQUIRES_REVIEW",
+      "status": "RESEARCHED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — definitional mapping NOT confirmed, see report §8 item 7"
     },
@@ -302,7 +465,11 @@
       "jurisdiction": "NG-FEDERAL_AND_STATE",
       "rule_key": "wht_remittance_deadline",
       "description": "CONFLICT between subsidiary regulation and primary Act. WHT Regs 2024 reg.7: Federal (NRS) remittance by 21st of following month; State (SIRS) remittance by 10th (CGT/PAYE heads) or 30th (other) of following month. NTAA 2025 s.107 (primary legislation, commencing 2026): uniform 21st day for ALL deducted/collected/withheld tax. Engine default: use NTAA s.107 (21st day) as later-in-time primary legislation; flagged for NRS/JRB confirmation.",
-      "value": { "engine_default_day_of_following_month": 21, "conflicting_state_cgt_paye_day": 10, "conflicting_state_other_day": 30 },
+      "value": {
+        "engine_default_day_of_following_month": 21,
+        "conflicting_state_cgt_paye_day": 10,
+        "conflicting_state_other_day": 30
+      },
       "value_type": "deadline_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -310,7 +477,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "NTAA Section 107(1); WHT Regs 2024 Regulation 7",
       "rule_version": "0.9-draft",
-      "status": "REQUIRES_REVIEW",
+      "status": "RESEARCHED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — conflict NOT resolved by authority guidance, see report §8 item 2"
     },
@@ -320,7 +487,9 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "penalty_failure_to_deduct",
       "description": "Penalty for failing to collect, deduct or withhold tax due",
-      "value": { "percentage_of_amount_not_deducted": 0.40 },
+      "value": {
+        "percentage_of_amount_not_deducted": 0.4
+      },
       "value_type": "penalty_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -328,7 +497,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 105",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -338,7 +507,11 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "penalty_failure_to_remit",
       "description": "Penalty for deducting/collecting/withholding tax but failing to remit by the deadline",
-      "value": { "principal_due": true, "administrative_penalty_pa": 0.10, "interest_reference_rate": "CBN Monetary Policy Rate" },
+      "value": {
+        "principal_due": true,
+        "administrative_penalty_pa": 0.1,
+        "interest_reference_rate": "CBN Monetary Policy Rate"
+      },
       "value_type": "penalty_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -346,7 +519,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 107(1)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -356,7 +529,10 @@
       "jurisdiction": "NG-FEDERAL",
       "rule_key": "penalty_failure_to_file_returns",
       "description": "Penalty for failing/refusing to file returns, or knowingly filing incomplete/inaccurate returns",
-      "value": { "first_month_ngn": 100000, "subsequent_month_ngn": 50000 },
+      "value": {
+        "first_month_ngn": 100000,
+        "subsequent_month_ngn": 50000
+      },
       "value_type": "penalty_rule",
       "effective_from": "2026-01-01",
       "effective_to": null,
@@ -364,7 +540,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ADMINISTRATION_ACT.pdf",
       "source_reference": "Section 101",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -375,19 +551,51 @@
       "rule_key": "capital_allowance_table_1",
       "description": "Annual capital allowance rates by asset class (First Schedule Part I, Table I). No separate initial allowance exists under NTA 2025.",
       "value": [
-        { "class": 1, "rate": 0.10, "assets": ["Building Expenditure", "Agricultural Expenditure", "Mast Expenditure", "Intangible assets Expenditure", "Heavy Transportation Expenditure"] },
-        { "class": 2, "rate": 0.20, "assets": ["Plant Expenditure", "Agricultural Equipment Expenditure", "Furniture and Fittings Expenditure", "Mining Expenditure", "Other Equipment Expenditure"] },
-        { "class": 3, "rate": 0.25, "assets": ["Motor Vehicle Expenditure", "Software Expenditure", "Other Capital Expenditure"] }
+        {
+          "class": 1,
+          "rate": 0.1,
+          "assets": [
+            "Building Expenditure",
+            "Agricultural Expenditure",
+            "Mast Expenditure",
+            "Intangible assets Expenditure",
+            "Heavy Transportation Expenditure"
+          ]
+        },
+        {
+          "class": 2,
+          "rate": 0.2,
+          "assets": [
+            "Plant Expenditure",
+            "Agricultural Equipment Expenditure",
+            "Furniture and Fittings Expenditure",
+            "Mining Expenditure",
+            "Other Equipment Expenditure"
+          ]
+        },
+        {
+          "class": 3,
+          "rate": 0.25,
+          "assets": [
+            "Motor Vehicle Expenditure",
+            "Software Expenditure",
+            "Other Capital Expenditure"
+          ]
+        }
       ],
       "value_type": "rate_table",
-      "conditions": { "notional_residual_value_pct": 0.01, "initial_allowance": "abolished", "short_period_proration": true },
+      "conditions": {
+        "notional_residual_value_pct": 0.01,
+        "initial_allowance": "abolished",
+        "short_period_proration": true
+      },
       "effective_from": "2026-01-01",
       "effective_to": null,
       "source_document": "Nigeria Tax Act, 2025",
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "First Schedule, Part I, Table I; paragraph 6",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     },
@@ -412,7 +620,7 @@
       "source_url": "https://irs.gm.gov.ng/docs/national/NIGERIA_TAX_ACT_2025.pdf",
       "source_reference": "Section 27(5)-(6)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval; re-confirm against Fifth/Sixth Schedules before relying on 'no cap found'"
     },
@@ -444,7 +652,7 @@
       "source_url": "https://capacityhub.org/Uploads/Workshop2/Deduction%20of%20Tax%20at%20Source%20(Withholding)%20Regulatio.pdf",
       "source_reference": "Regulation 10(1)-(2)",
       "rule_version": "1.0",
-      "status": "DRAFT_VERIFIED",
+      "status": "VERIFIED",
       "verification_date": "2026-10-06",
       "verified_by": "AI regulatory research pass — pending tax professional approval"
     }

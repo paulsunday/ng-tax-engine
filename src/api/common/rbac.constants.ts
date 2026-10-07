@@ -105,4 +105,6 @@ export interface JwtPayload {
   roleId: string | null;
   roleName: string | null;
   isPlatformAdmin: boolean;
+  // Cross-tenant, same axis as isPlatformAdmin — see User.isTaxRuleApprover.
+  isTaxRuleApprover: boolean;
 }

@@ -59,7 +59,9 @@ export class AuthService {
       reason: "Self-service registration",
     });
 
-    return { accessToken: this.signToken(user.id, user.email, organization.id, ownerRole.id, ownerRole.name, false) };
+    return {
+      accessToken: this.signToken(user.id, user.email, organization.id, ownerRole.id, ownerRole.name, false, false),
+    };
   }
 
   async login(dto: LoginDto): Promise<{ accessToken: string }> {
@@ -104,7 +106,8 @@ export class AuthService {
         membership?.organizationId ?? null,
         membership?.roleId ?? null,
         membership?.role.name ?? null,
-        user.isPlatformAdmin
+        user.isPlatformAdmin,
+        user.isTaxRuleApprover
       ),
     };
   }
@@ -150,9 +153,10 @@ export class AuthService {
     organizationId: string | null,
     roleId: string | null,
     roleName: string | null,
-    isPlatformAdmin: boolean
+    isPlatformAdmin: boolean,
+    isTaxRuleApprover: boolean
   ): string {
-    const payload: JwtPayload = { sub: userId, email, organizationId, roleId, roleName, isPlatformAdmin };
+    const payload: JwtPayload = { sub: userId, email, organizationId, roleId, roleName, isPlatformAdmin, isTaxRuleApprover };
     return this.jwt.sign(payload);
   }
 }

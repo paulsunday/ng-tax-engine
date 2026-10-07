@@ -38,6 +38,11 @@ model User {
   passwordHash    String
   fullName        String
   isPlatformAdmin Boolean  @default(false) // brief §5: Platform Administrator is cross-tenant, everyone else is tenant-scoped
+  // Cross-tenant, same axis as isPlatformAdmin — NOT a per-organization Role. A statutory
+  // tax rule serves every tenant's calculations at once, so "who may approve/activate one"
+  // is a platform-level question, not a company-level job function (production-readiness
+  // mandate §1: "Only authorised users with the appropriate tax administration role").
+  isTaxRuleApprover Boolean @default(false)
   mfaEnabled      Boolean  @default(false)
   mfaSecret       String?  // TOTP secret, never returned by any API response
   isActive        Boolean  @default(true)
@@ -45,6 +50,11 @@ model User {
 
   memberships     OrganizationUser[]
   auditLogs       AuditLog[]
+
+  taxRuleReviews          TaxRuleReview[]
+  taxRuleApprovals        TaxRuleApproval[]
+  taxRuleChangeHistory    TaxRuleChangeHistory[]
+  taxRuleActivationEvents TaxRuleActivationEvent[]
 }
 
 // A system-defined role per brief §5. Custom per-organization roles can be added later by
@@ -145,17 +155,22 @@ enum Jurisdiction {
   NG_FEDERAL
   NG_STATE
   NG_LOCAL
+  NG_FEDERAL_AND_STATE // rules whose basis applies regardless of which jurisdiction is asked (e.g. some WHT deadline rules)
 }
 
+// Full rule-governance lifecycle (production-readiness mandate §1). A rule is never ACTIVE
+// merely because a field was edited by hand — see TaxRuleActivationEvent/TaxRuleApproval,
+// which the governance API (src/api/tax-rule-governance) is the only writer of.
 enum RuleStatus {
-  DRAFT              // newly authored, not yet reviewed
-  REQUIRES_REVIEW     // source unverified / ambiguous — must never be used in a live calculation
-  DRAFT_VERIFIED       // source-confirmed by research pass, awaiting tax-professional approval
-  APPROVED             // approved by a qualified tax professional, not yet activated
-  ACTIVE               // live — usable for calculations within its effective window
-  SUPERSEDED           // replaced by a newer rule_version; kept for historical reproducibility
-  REJECTED             // reviewed and rejected — never used
-  DEACTIVATED          // administrator deactivated (e.g. erroneous rule caught before use)
+  DRAFT              // newly authored, no research attached yet
+  RESEARCHED         // source attached but the figure itself is unconfirmed/ambiguous
+  VERIFIED           // source-confirmed against the primary text
+  PENDING_APPROVAL   // submitted for a qualified tax professional's decision
+  APPROVED           // approved by a qualified tax professional, not yet activated
+  ACTIVE             // live — usable for calculations within its effective window
+  SUPERSEDED         // replaced by a newer rule_version; kept for historical reproducibility
+  RETIRED            // administratively withdrawn
+  REJECTED           // reviewed and rejected — never used
 }
 
 enum ConfidenceLevel {
@@ -206,7 +221,19 @@ model TaxRuleVersion {
   taxRuleId        String
   taxRule          TaxRule     @relation(fields: [taxRuleId], references: [id])
   ruleVersion      String      // semantic, e.g. "1.0", "1.1"
+  taxYear          Int?        // the tax year this version is understood to apply to, where meaningful
   value            Json        // shape depends on rule: percentage, band table, deadline rule, object...
+  // The four fields below are denormalized, display-friendly projections of `value` for
+  // admin/review screens — populated during research/import, never the engine's source of
+  // truth (the engine reads `value`, via RuleRecord, exactly as it always has). Deliberately
+  // nullable and independently shaped per rule type, same philosophy as `value` itself: this
+  // engine never forces one rigid structure onto every statutory figure (CIT rate vs a
+  // capital-allowance band table vs a WHT schedule all need different shapes).
+  rateValue        Decimal?    @db.Decimal(14, 6)
+  thresholds       Json?
+  allowances       Json?
+  deductions       Json?
+  calculationMethod String?    // human-readable description of how `value` is meant to be applied
   conditions       Json?       // eligibility conditions (company classification, recipient type, etc.)
   effectiveFrom    DateTime
   effectiveTo      DateTime?
@@ -216,6 +243,13 @@ model TaxRuleVersion {
   sourceId         String
   source           TaxRuleSource @relation(fields: [sourceId], references: [id])
   sourceReference  String       // section/paragraph/schedule within the source document
+  researchNotes    String?      // free-text: what was found, what's still ambiguous, why
+
+  filingFrequency      String?        // e.g. "MONTHLY", "ANNUAL" — descriptive, the authoritative basis lives in TaxDeadlineRule
+  filingDeadlineRuleId String?
+  filingDeadlineRule   TaxDeadlineRule? @relation("FilingDeadlineRule", fields: [filingDeadlineRuleId], references: [id])
+  paymentDeadlineRuleId String?
+  paymentDeadlineRule   TaxDeadlineRule? @relation("PaymentDeadlineRule", fields: [paymentDeadlineRuleId], references: [id])
 
   verificationDate DateTime?
   verifiedBy       String?      // person or process that confirmed the figure against source text
@@ -232,11 +266,83 @@ model TaxRuleVersion {
   changeRecord     RegulatoryChangeRecord? @relation(fields: [changeRecordId], references: [id])
 
   createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   taxReturnUsages  TaxReturnRuleUsage[]
+  reviews          TaxRuleReview[]
+  approvals        TaxRuleApproval[]
+  changeHistory    TaxRuleChangeHistory[]
+  activationEvents TaxRuleActivationEvent[]
 
   @@index([taxRuleId, effectiveFrom, effectiveTo])
   @@index([status])
+}
+
+// One row per "submit for approval" / "request revision" cycle. Distinct from
+// TaxRuleApproval: a review is a recommendation from any authorised reviewer: an approval
+// decision is specifically the qualified-tax-professional APPROVE/REJECT act.
+model TaxRuleReview {
+  id             String          @id @default(cuid())
+  ruleVersionId  String
+  ruleVersion    TaxRuleVersion  @relation(fields: [ruleVersionId], references: [id])
+  reviewerId     String
+  reviewer       User            @relation(fields: [reviewerId], references: [id])
+  reviewType     String          // "SUBMISSION" | "REVISION_REQUEST"
+  notes          String?
+  createdAt      DateTime        @default(now())
+
+  @@index([ruleVersionId])
+}
+
+// Append-only record of every APPROVE/REJECT decision. TaxRuleVersion.approvedBy/approvedAt
+// mirror the latest decision for quick lookup; this table is the full history, including a
+// prior REJECTED decision on a version that was later revised and approved.
+model TaxRuleApproval {
+  id             String          @id @default(cuid())
+  ruleVersionId  String
+  ruleVersion    TaxRuleVersion  @relation(fields: [ruleVersionId], references: [id])
+  approverId     String
+  approver       User            @relation(fields: [approverId], references: [id])
+  decision       String          // "APPROVED" | "REJECTED"
+  reason         String?
+  createdAt      DateTime        @default(now())
+
+  @@index([ruleVersionId])
+}
+
+// Generic append-only audit trail specific to rule-version mutations (narrower and more
+// queryable than the general AuditLog table, for a dedicated "rule history" admin screen).
+model TaxRuleChangeHistory {
+  id             String          @id @default(cuid())
+  ruleVersionId  String
+  ruleVersion    TaxRuleVersion  @relation(fields: [ruleVersionId], references: [id])
+  action         String          // "CREATED" | "RESEARCHED" | "VERIFIED" | "SUBMITTED" | "APPROVED" | "REJECTED" | "REVISION_REQUESTED" | "ACTIVATED" | "SUPERSEDED" | "RETIRED"
+  performedById  String
+  performedBy    User            @relation(fields: [performedById], references: [id])
+  previousStatus RuleStatus?
+  newStatus      RuleStatus?
+  previousValue  Json?
+  newValue       Json?
+  reason         String?
+  createdAt      DateTime        @default(now())
+
+  @@index([ruleVersionId, createdAt])
+}
+
+// Focused timeline of ACTIVE transitions specifically — "when did this exact figure go
+// live, and who flipped it" is its own compliance question, worth answering without
+// filtering the generic change history.
+model TaxRuleActivationEvent {
+  id             String          @id @default(cuid())
+  ruleVersionId  String
+  ruleVersion    TaxRuleVersion  @relation(fields: [ruleVersionId], references: [id])
+  activatedById  String
+  activatedBy    User            @relation(fields: [activatedById], references: [id])
+  activatedAt    DateTime        @default(now())
+  deactivatedAt  DateTime?
+  reason         String?
+
+  @@index([ruleVersionId])
 }
 
 // Every rule must cite one of these. This is the "source hierarchy" object from the brief §2/§23.
@@ -305,6 +411,9 @@ model TaxDeadlineRule {
   sourceReference String
   status          RuleStatus    @default(DRAFT)
   createdAt       DateTime      @default(now())
+
+  filingDeadlineForRuleVersions  TaxRuleVersion[] @relation("FilingDeadlineRule")
+  paymentDeadlineForRuleVersions TaxRuleVersion[] @relation("PaymentDeadlineRule")
 }
 
 model TaxPenaltyRule {

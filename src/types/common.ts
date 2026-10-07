@@ -17,15 +17,31 @@ export type TaxType =
   | "STATE_LEVY"
   | "GENERAL";
 
+/**
+ * Full rule-governance lifecycle (master-build-prompt production-readiness mandate §1):
+ * DRAFT -> RESEARCHED -> VERIFIED -> PENDING_APPROVAL -> APPROVED -> ACTIVE -> SUPERSEDED.
+ * RETIRED and REJECTED are terminal off-ramps from anywhere in that chain.
+ *   DRAFT             newly authored, no research attached yet
+ *   RESEARCHED        a source is attached but the figure itself is unconfirmed/ambiguous
+ *                      (was "REQUIRES_REVIEW" — renamed for an explicit 9-state lifecycle)
+ *   VERIFIED          source-confirmed against the primary text (was "DRAFT_VERIFIED")
+ *   PENDING_APPROVAL  submitted for a qualified tax professional's decision
+ *   APPROVED          approved by a qualified tax professional, not yet live
+ *   ACTIVE            live — usable for calculations within its effective window
+ *   SUPERSEDED        replaced by a newer rule_version; kept for historical reproducibility
+ *   RETIRED           administratively withdrawn without ever being wrong per se (was "DEACTIVATED")
+ *   REJECTED          reviewed and rejected — never used
+ */
 export type RuleStatus =
   | "DRAFT"
-  | "REQUIRES_REVIEW"
-  | "DRAFT_VERIFIED"
+  | "RESEARCHED"
+  | "VERIFIED"
+  | "PENDING_APPROVAL"
   | "APPROVED"
   | "ACTIVE"
   | "SUPERSEDED"
-  | "REJECTED"
-  | "DEACTIVATED";
+  | "RETIRED"
+  | "REJECTED";
 
 /**
  * Statuses that are safe to use in a live calculation.

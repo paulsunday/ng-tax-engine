@@ -37,6 +37,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { AiToolsModule } from "./ai-tools/ai-tools.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { HealthModule } from "./health/health.module";
+import { TaxRuleGovernanceModule } from "./tax-rule-governance/tax-rule-governance.module";
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { HealthModule } from "./health/health.module";
     AiToolsModule,
     SchedulerModule,
     HealthModule,
+    TaxRuleGovernanceModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

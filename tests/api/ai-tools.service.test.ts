@@ -29,7 +29,7 @@ function makeMocks() {
 }
 
 function user(overrides: Partial<JwtPayload> = {}): JwtPayload {
-  return { sub: "user-1", email: "a@b.com", organizationId: "org-1", roleId: "role-1", roleName: "ACCOUNTANT", isPlatformAdmin: false, ...overrides };
+  return { sub: "user-1", email: "a@b.com", organizationId: "org-1", roleId: "role-1", roleName: "ACCOUNTANT", isPlatformAdmin: false, isTaxRuleApprover: false, ...overrides };
 }
 
 describe("AiToolsService.invoke — access control", () => {
