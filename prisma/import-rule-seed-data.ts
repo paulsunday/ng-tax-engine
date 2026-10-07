@@ -79,6 +79,7 @@ async function main() {
 
   let created = 0;
   let skipped = 0;
+  let incomplete = 0;
 
   for (const rule of parsed.rules) {
     if (rule.status !== "RESEARCHED" && rule.status !== "VERIFIED") {
@@ -87,6 +88,19 @@ async function main() {
           `create RESEARCHED or VERIFIED rows; every later transition must happen through the ` +
           `tax-rule-governance API, performed by an authorised human.`
       );
+    }
+
+    // A handful of seed rules are known, documented research gaps (e.g. the monthly PAYE
+    // remittance deadline — see REGULATORY_RESEARCH_REPORT.md §8/§9.5) with no source and
+    // no confirmed value at all. Importing those as empty rows would create something that
+    // LOOKS like a real candidate rule when it isn't one — skip them loudly instead.
+    if (!rule.source_document || !rule.source_url || rule.value === null || rule.value === undefined || !rule.effective_from) {
+      console.warn(
+        `SKIPPING "${rule.id}": missing source and/or value and/or effective_from — this is a known, unresolved ` +
+          `research gap, not an importable candidate rule. (${rule.description})`
+      );
+      incomplete++;
+      continue;
     }
 
     const taxType = rule.tax_type as any;
@@ -108,9 +122,6 @@ async function main() {
       continue;
     }
 
-    if (!rule.source_document || !rule.source_url) {
-      throw new Error(`Rule "${rule.id}" has no source_document/source_url — refusing to import a rule with no cited source.`);
-    }
     const source = await prisma.taxRuleSource.upsert({
       where: { id: `seed:${rule.source_document}` },
       update: {},
@@ -143,7 +154,10 @@ async function main() {
     created++;
   }
 
-  console.log(`Imported ${created} new rule version(s), skipped ${skipped} already-imported rule version(s).`);
+  console.log(
+    `Imported ${created} new rule version(s), skipped ${skipped} already-imported rule version(s), ` +
+      `${incomplete} unresolved research gap(s) left out entirely.`
+  );
   console.log(
     `None of these are PENDING_APPROVAL, APPROVED, or ACTIVE — a qualified tax professional must take each one ` +
       `through verify -> submit-for-approval -> approve -> activate via the tax-rule-governance API.`
