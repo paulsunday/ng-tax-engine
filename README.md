@@ -13,6 +13,11 @@ two stacked specifications:
    analysis, tax computation/filing workflow, compliance reminders, and a controlled AI tool
    dispatcher.
 
+See `docs/PRODUCTION_READINESS_REPORT.md` for the current honest readiness verdict,
+`docs/DISASTER_RECOVERY.md` for verified backup/restore procedures,
+`docs/MONITORING.md` for operational visibility status, and `docs/NDPR_GAP_ANALYSIS.md` for
+data-protection compliance gaps.
+
 ## Architecture
 
 ```
@@ -154,9 +159,9 @@ manual `railway up` step.
 - **No real government e-filing API.** Filing always produces a manual package for human
   submission (one state, Enugu, has a purpose-built adapter; everywhere else uses the
   generic manual adapter).
-- **Single-organization login.** `AuthService.login` logs into the first active membership
-  found; a user belonging to multiple organizations needs an org-switcher endpoint
-  (unbuilt) to get a token scoped to a different membership.
+- ~~Single-organization login.~~ **Built**: `POST /auth/switch-organization` re-issues a
+  token scoped to an explicit target organization; tenant isolation verified by a dedicated
+  IDOR test suite.
 - **Document storage** (`FILE_STORAGE_ROOT`) is a single Railway volume mounted on one
   instance — it survives redeploys, but not horizontal scale-out (multiple replicas would
   each see their own empty volume). Swap `LocalFileStorageAdapter` for an S3/Blob-backed
