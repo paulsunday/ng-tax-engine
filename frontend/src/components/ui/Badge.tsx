@@ -26,8 +26,8 @@ export function StatusBadge({ status }: { status: string }) {
   const s = status.toUpperCase();
   let tone: Tone = "neutral";
   if (["POSTED", "PAID", "ACTIVE", "APPROVED", "CALCULATED", "FILED", "CONFIRMED", "SUCCESS"].includes(s)) tone = "success";
-  else if (["DRAFT", "PENDING", "PENDING_RULE_APPROVAL", "UNMATCHED", "RESEARCHED", "VERIFIED", "NOT_APPLICABLE"].includes(s)) tone = "warning";
-  else if (["FAILED", "OVERDUE", "REJECTED", "CALCULATION_ERROR", "VOIDED", "MISSING_TAXPAYER_INFORMATION", "MISSING_REGULATORY_INFORMATION"].includes(s))
+  else if (["DRAFT", "PENDING", "PENDING_RULE_APPROVAL", "UNMATCHED", "RESEARCHED", "VERIFIED", "NOT_APPLICABLE", "INVITED", "EXPIRED"].includes(s)) tone = "warning";
+  else if (["FAILED", "OVERDUE", "REJECTED", "CALCULATION_ERROR", "VOIDED", "MISSING_TAXPAYER_INFORMATION", "MISSING_REGULATORY_INFORMATION", "DISABLED"].includes(s))
     tone = "danger";
   return <Badge tone={tone}>{s.replaceAll("_", " ")}</Badge>;
 }

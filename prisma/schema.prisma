@@ -34,9 +34,10 @@ model Organization {
   termsAcceptedAt DateTime?
   termsVersion    String?
 
-  members   OrganizationUser[]
-  companies Company[]
-  auditLogs AuditLog[]
+  members     OrganizationUser[]
+  companies   Company[]
+  auditLogs   AuditLog[]
+  invitations OrganizationInvitation[]
 }
 
 model User {
@@ -53,6 +54,15 @@ model User {
   mfaEnabled      Boolean  @default(false)
   mfaSecret       String?  // TOTP secret, never returned by any API response
   isActive        Boolean  @default(true)
+  // True once this account has a password someone actually chose. Defaults to true so
+  // every pre-existing row (self-registered, or created by the old Phase-1 addMember
+  // shortcut) is correctly "already usable" after this migration. A brand-new user created
+  // by the invitation flow (OrganizationsService.inviteMember) is the only path that sets
+  // this false — the row exists with an unusable random password hash until
+  // AuthService.acceptInvitation lets them set a real one. Lets invitation "inspect" tell a
+  // genuinely-new invitee (must set a password) apart from an existing account being added
+  // to another organization (no password step) without guessing from passwordHash shape.
+  passwordSet     Boolean  @default(true)
   // Password reset (mandate §11). Only the HASH of the reset token is ever stored — same
   // principle as passwordHash itself — so a database read alone can never yield a usable
   // token. Single-use: both fields are cleared the moment a reset succeeds.
@@ -67,6 +77,7 @@ model User {
 
   memberships     OrganizationUser[]
   auditLogs       AuditLog[]
+  invitationsSent OrganizationInvitation[] @relation("InvitationsSent")
 
   taxRuleReviews          TaxRuleReview[]
   taxRuleApprovals        TaxRuleApproval[]
@@ -86,6 +97,7 @@ model Role {
 
   rolePermissions RolePermission[]
   memberships     OrganizationUser[]
+  invitations     OrganizationInvitation[]
 }
 
 // Permission keys per brief §5 (view/create/edit/delete/approve transactions, import bank
@@ -128,7 +140,38 @@ model OrganizationUser {
   status         MembershipStatus @default(ACTIVE)
   joinedAt       DateTime         @default(now())
 
+  invitations OrganizationInvitation[]
+
   @@unique([organizationId, userId])
+}
+
+// A pending (or historical) invitation onto one OrganizationUser membership. Deliberately
+// its own table rather than extra columns on OrganizationUser (additive migration, and a
+// membership can legitimately have more than one invitation row over its lifetime — e.g.
+// invited -> accepted -> later disabled -> re-invited creates a second row). "Live" (still
+// usable) means acceptedAt IS NULL AND revokedAt IS NULL AND expiresAt > now — enforced at
+// the application layer, plus a partial unique index (see migration SQL) so at most one
+// live row per membership can exist even under concurrent requests.
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  membershipId   String
+  membership     OrganizationUser @relation(fields: [membershipId], references: [id])
+  email          String       // normalised (trimmed, lowercased) at write time — the address the invite was sent to
+  roleId         String
+  role           Role         @relation(fields: [roleId], references: [id])
+  invitedByUserId String
+  invitedBy      User         @relation("InvitationsSent", fields: [invitedByUserId], references: [id])
+  tokenHash      String       @unique // SHA-256 hash only — same principle as User.passwordResetTokenHash
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([membershipId])
+  @@index([email])
 }
 
 // Immutable (brief §29): no update/delete mutation is exposed for this model anywhere in

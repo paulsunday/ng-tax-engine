@@ -419,3 +419,137 @@ describe("AuthService MFA setup/enable/disable", () => {
     await expect(service.disableMfa("u1", "123456")).rejects.toThrow(/not currently enabled/);
   });
 });
+
+describe("AuthService.inspectInvitation / acceptInvitation", () => {
+  function invitationMocks() {
+    const { prisma, jwt, auditLog, mfa, email } = makeMocks();
+    prisma.organizationInvitation = { findUnique: jest.fn(), update: jest.fn() };
+    return { prisma, jwt, auditLog, mfa, email };
+  }
+
+  const liveInvitation = {
+    id: "inv-1",
+    organizationId: "org-1",
+    membershipId: "membership-1",
+    acceptedAt: null,
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 60_000),
+    organization: { name: "Acme Ltd" },
+    role: { id: "role-1", name: "ACCOUNTANT" },
+    invitedBy: { fullName: "Jane Owner" },
+    membership: {
+      membershipId: "membership-1",
+      user: { id: "user-1", email: "new.person@example.com", isActive: true, erasedAt: null, passwordSet: false, isPlatformAdmin: false, isTaxRuleApprover: false },
+      role: { id: "role-1", name: "ACCOUNTANT" },
+    },
+  };
+
+  test.each([
+    ["a nonexistent token", null],
+    ["an already-accepted invitation", { ...liveInvitation, acceptedAt: new Date() }],
+    ["a revoked invitation", { ...liveInvitation, revokedAt: new Date() }],
+    ["an expired invitation", { ...liveInvitation, expiresAt: new Date(Date.now() - 1000) }],
+  ])("inspectInvitation gives the same generic error for %s (no account enumeration)", async (_label, mockReturn) => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(mockReturn);
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await expect(service.inspectInvitation("some-token")).rejects.toThrow(BadRequestException);
+  });
+
+  test("inspectInvitation returns a masked email and requiresPassword=true for a brand-new invitee", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(liveInvitation);
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    const result = await service.inspectInvitation("some-token");
+
+    expect(result.organizationName).toBe("Acme Ltd");
+    expect(result.invitedByName).toBe("Jane Owner");
+    expect(result.roleName).toBe("ACCOUNTANT");
+    expect(result.maskedEmail).not.toBe("new.person@example.com");
+    expect(result.maskedEmail).toContain("@example.com");
+    expect(result.requiresPassword).toBe(true);
+  });
+
+  test("inspectInvitation reports requiresPassword=false for an existing account that already has a password", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue({
+      ...liveInvitation,
+      membership: { ...liveInvitation.membership, user: { ...liveInvitation.membership.user, passwordSet: true } },
+    });
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    const result = await service.inspectInvitation("some-token");
+    expect(result.requiresPassword).toBe(false);
+  });
+
+  test("acceptInvitation requires a password for a brand-new invitee and rejects a missing one", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(liveInvitation);
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await expect(service.acceptInvitation("token", "Full Name", undefined)).rejects.toThrow(BadRequestException);
+  });
+
+  test("acceptInvitation sets a real password, flips passwordSet, activates the membership, and returns a session token", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(liveInvitation);
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    prisma.organizationUser.update = jest.fn().mockResolvedValue({});
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    const result = await service.acceptInvitation("token", "Corrected Name", "brand-new-password");
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { passwordHash: expect.any(String), passwordSet: true, fullName: "Corrected Name" },
+    });
+    expect(prisma.organizationUser.update).toHaveBeenCalledWith({
+      where: { id: "membership-1" },
+      data: { status: "ACTIVE", joinedAt: expect.any(Date) },
+    });
+    expect(prisma.organizationInvitation.update).toHaveBeenCalledWith({ where: { id: "inv-1" }, data: { acceptedAt: expect.any(Date) } });
+    expect(result.accessToken).toBe("signed.jwt.token");
+    expect(auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: "ACCEPT_INVITATION", userId: "user-1" }));
+  });
+
+  test("acceptInvitation for an EXISTING account (passwordSet=true) ignores any password sent and never touches it", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue({
+      ...liveInvitation,
+      membership: { ...liveInvitation.membership, user: { ...liveInvitation.membership.user, passwordSet: true } },
+    });
+    prisma.user.update = jest.fn();
+    prisma.organizationUser.update = jest.fn().mockResolvedValue({});
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await service.acceptInvitation("token", undefined, undefined);
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["an already-accepted invitation", { ...liveInvitation, acceptedAt: new Date() }],
+    ["a revoked invitation", { ...liveInvitation, revokedAt: new Date() }],
+    ["an expired invitation", { ...liveInvitation, expiresAt: new Date(Date.now() - 1000) }],
+    ["a nonexistent token", null],
+  ])("acceptInvitation refuses %s with the same generic error", async (_label, mockReturn) => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(mockReturn);
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await expect(service.acceptInvitation("token", undefined, "whatever-password")).rejects.toThrow(BadRequestException);
+  });
+
+  test("acceptInvitation refuses a deactivated or erased account even with a technically-valid token", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue({
+      ...liveInvitation,
+      membership: { ...liveInvitation.membership, user: { ...liveInvitation.membership.user, isActive: false } },
+    });
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await expect(service.acceptInvitation("token", undefined, "whatever-password")).rejects.toThrow(BadRequestException);
+  });
+});

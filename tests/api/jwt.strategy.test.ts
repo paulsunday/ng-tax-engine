@@ -59,6 +59,15 @@ describe("JwtStrategy.validate — re-checks live account state on every request
     await expect(strategy.validate(basePayload)).rejects.toThrow(UnauthorizedException);
   });
 
+  test("rejects a token for an INVITED (not yet accepted) membership — an unaccepted invite must never grant a working session", async () => {
+    const { prisma } = makeMocks();
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", email: "a@b.com", isActive: true, isPlatformAdmin: false, isTaxRuleApprover: false });
+    prisma.organizationUser.findUnique.mockResolvedValue({ roleId: "old-role-id", status: "INVITED", role: { name: "ACCOUNTANT" } });
+    const strategy = new JwtStrategy(prisma);
+
+    await expect(strategy.validate(basePayload)).rejects.toThrow(UnauthorizedException);
+  });
+
   test("reflects a role reassignment made AFTER the token was signed, not the token's original roleId", async () => {
     const { prisma } = makeMocks();
     prisma.user.findUnique.mockResolvedValue({ id: "u1", email: "a@b.com", isActive: true, isPlatformAdmin: false, isTaxRuleApprover: false });

@@ -129,6 +129,58 @@ ONE company:
 
 A key can never create users or grant access a person doesn't already have.
 
+## Team members (invitations)
+
+A company owner/admin invites a teammate from **Settings → Team members**
+(`frontend/src/app/settings/team/page.tsx`):
+
+1. `POST /organizations/me/invitations` `{ email, fullName, roleName }` — creates the
+   `User` row if the email doesn't already exist (an unusable random password, never sent
+   anywhere — `User.passwordSet: false`) and an `OrganizationUser` membership with
+   `status: INVITED`. A single-use token (32 random bytes, only its SHA-256 hash stored on
+   `OrganizationInvitation.tokenHash`) is emailed as an accept link
+   (`/accept-invite#token=…`, fragment so it never reaches server logs). If no SMTP
+   provider is configured, the plaintext link is returned to the inviter instead (same
+   honest fallback as `requestPasswordReset`) — share it with the invitee directly.
+2. The invitee opens the link; the frontend calls `POST /auth/invitations/inspect` (shows
+   who invited them, into which organization, as what role, before asking for anything)
+   then `POST /auth/invitations/accept` `{ token, fullName?, password? }`. A brand-new
+   invitee (`passwordSet: false`) must set a password (same policy as registration); an
+   existing account just confirms — no password involved. Acceptance flips the membership
+   to `ACTIVE` in the same transaction.
+3. **An `INVITED` membership has no access to anything** — `JwtStrategy.validate`,
+   `AuthService.switchOrganization`, `AuthService.login`'s membership list, and
+   `IntegrationsService.createSsoLink` (the SSO flow above) all require `status: ACTIVE`.
+   Accepting the invite is the only way in.
+4. An owner/admin can resend a pending invite (new token, old one stops working
+   immediately), revoke it (membership becomes `DISABLED`), change anyone's role, or
+   disable/re-enable a member directly. Guardrails, each enforced server-side regardless of
+   what the UI offers:
+   - **No privilege escalation**: you can't grant a role whose permissions exceed your own,
+     and only a `COMPANY_OWNER` can grant/change/remove the `COMPANY_OWNER` role (needed
+     because `COMPANY_ADMIN` has an identical permission set today — a plain permission-
+     subset check alone wouldn't stop it). `PLATFORM_ADMIN` is never grantable as an
+     organization role.
+   - **No lockout**: an organization always keeps at least one `ACTIVE` `COMPANY_OWNER`;
+     nobody can disable or change their own role; the owner-count check runs inside a
+     `Serializable` transaction so two concurrent actions can't both leave zero owners.
+   - **Abuse limits**: 20 invitations/hour per organization and per inviter, 100 pending
+     invitations per organization, `@Throttle`d inspect/accept endpoints.
+   - In production, invitations refuse to send if `FRONTEND_URL` isn't set, rather than
+     generating a link nobody can use.
+5. **Recovering a locked-out organization** (its only `COMPANY_OWNER` account is lost —
+   e.g. the person left and their email is gone): there is no code-level backdoor. A
+   platform administrator uses `UsersService.setTaxRuleApprover`-style direct DB access —
+   i.e. a deliberate out-of-band operational action (grant a trusted existing member
+   `COMPANY_OWNER` via `prisma studio`/a one-off script, or restore `requestPasswordReset`
+   for the existing owner account), logged like any other administrative intervention.
+   This is intentionally NOT a self-service API — building one would itself be a
+   privilege-escalation path.
+
+The old `POST /organizations/me/members` (inviter sets a temporary password directly, no
+acceptance step) still works — kept for backward compatibility — but is `@deprecated` and
+the frontend no longer calls it.
+
 ## Setup
 
 ```bash
@@ -148,7 +200,7 @@ DB connectivity).
 ```bash
 npm run lint      # eslint
 npx tsc --noEmit  # type-check
-npm test          # 358 tests across 53 suites, all unit tests against a mocked PrismaService
+npm test          # 496 tests across 62 suites, all unit tests against a mocked PrismaService
 npm run build
 ```
 
