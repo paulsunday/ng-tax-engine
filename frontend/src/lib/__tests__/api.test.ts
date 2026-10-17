@@ -54,6 +54,21 @@ describe("apiFetch", () => {
     const result = await apiFetch("/companies/x");
     expect(result).toBeUndefined();
   });
+
+  test("a 401 while a token is set clears the stored token (forced logout — revoked/expired session)", async () => {
+    setToken("fake-token");
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401, json: async () => ({ message: "Account is no longer active." }) });
+
+    await expect(apiFetch("/companies")).rejects.toThrow(ApiError);
+    expect(window.localStorage.getItem("accessToken")).toBeNull();
+  });
+
+  test("a 401 with NO token set (e.g. a failed login attempt) does not try to clear anything that wasn't there", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401, json: async () => ({ message: "Invalid credentials." }) });
+
+    await expect(apiFetch("/auth/login")).rejects.toThrow("Invalid credentials.");
+    expect(window.localStorage.getItem("accessToken")).toBeNull();
+  });
 });
 
 describe("apiUpload", () => {

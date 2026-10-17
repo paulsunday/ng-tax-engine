@@ -19,6 +19,20 @@ export function setToken(token: string | null) {
 }
 
 /**
+ * A 401 means the backend has rejected this token right now — expired, or (since the
+ * JwtStrategy live-revalidation fix) a deactivated account, a membership that was removed/
+ * disabled, or an admin/approver flag that was revoked mid-session. Clearing the token and
+ * sending the user to /login here, in one place, means every page gets a clean forced
+ * logout instead of each one separately rendering a raw "Unauthorized" error inline.
+ */
+function handleUnauthorized() {
+  setToken(null);
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+/**
  * Thin fetch wrapper over the real NestJS API — no mock data anywhere. Every page in this
  * app reads/writes through here, so there is exactly one place that knows how auth headers
  * and error bodies are shaped.
@@ -44,6 +58,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       body && typeof body === "object" && "message" in body
         ? String((body as { message: unknown }).message)
         : `Request to ${path} failed with status ${res.status}`;
+    if (res.status === 401 && token) handleUnauthorized();
     throw new ApiError(res.status, message, body);
   }
 
@@ -70,6 +85,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
       body && typeof body === "object" && "message" in body
         ? String((body as { message: unknown }).message)
         : `Request to ${path} failed with status ${res.status}`;
+    if (res.status === 401 && token) handleUnauthorized();
     throw new ApiError(res.status, message, body);
   }
   return res.json() as Promise<T>;
