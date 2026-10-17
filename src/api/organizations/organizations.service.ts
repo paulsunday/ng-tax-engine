@@ -10,7 +10,8 @@ import { ROLES } from "../common/rbac.constants";
 const BCRYPT_ROUNDS = 12;
 const INVITE_TTL_MS = Number(process.env.INVITE_TTL_HOURS ?? 168) * 60 * 60 * 1000; // 7 days
 const MAX_PENDING_INVITATIONS_PER_ORG = 100;
-const INVITE_RATE_LIMIT_PER_HOUR = 20;
+const INVITE_RATE_LIMIT_PER_HOUR = 20; // invitation emails (new invites + resends) per organization and per inviter
+const RESENDS_PER_INVITATION_PER_HOUR = 3;
 const HOUR_MS = 60 * 60 * 1000;
 
 export interface AddMemberInput {
@@ -204,6 +205,13 @@ export class OrganizationsService {
       });
 
       return { invitation, userId: user.id };
+    }).catch((error: unknown) => {
+      // A simultaneous invite for the same person won the race (unique email, membership
+      // or one-live-invitation index): report it as the conflict it is, not a 500.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictException("An invitation for this person was just created — refresh the list.");
+      }
+      throw error;
     });
 
     const organization = await this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
@@ -231,6 +239,12 @@ export class OrganizationsService {
     }
 
     await this.assertWithinRateLimits(organizationId, actingUserId);
+    const recentResends = await this.prisma.auditLog.count({
+      where: { organizationId, objectId: invitationId, action: "RESEND_INVITATION", createdAt: { gte: new Date(Date.now() - HOUR_MS) } },
+    });
+    if (recentResends >= RESENDS_PER_INVITATION_PER_HOUR) {
+      throw new BadRequestException("This invitation has been resent too many times in the last hour — try again later.");
+    }
 
     const plaintextToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(plaintextToken).digest("hex");
@@ -324,11 +338,17 @@ export class OrganizationsService {
 
   private async assertWithinRateLimits(organizationId: string, actingUserId: string): Promise<void> {
     const since = new Date(Date.now() - HOUR_MS);
-    const [orgCount, inviterCount, pendingCount] = await Promise.all([
+    // Every invitation email counts: new invitations by their row, resends by their audit
+    // entry (a resend reuses the row, so counting rows alone let resends go unlimited).
+    const [orgInvites, inviterInvites, orgResends, inviterResends, pendingCount] = await Promise.all([
       this.prisma.organizationInvitation.count({ where: { organizationId, createdAt: { gte: since } } }),
       this.prisma.organizationInvitation.count({ where: { organizationId, invitedByUserId: actingUserId, createdAt: { gte: since } } }),
+      this.prisma.auditLog.count({ where: { organizationId, action: "RESEND_INVITATION", createdAt: { gte: since } } }),
+      this.prisma.auditLog.count({ where: { organizationId, userId: actingUserId, action: "RESEND_INVITATION", createdAt: { gte: since } } }),
       this.prisma.organizationInvitation.count({ where: { organizationId, acceptedAt: null, revokedAt: null } }),
     ]);
+    const orgCount = orgInvites + orgResends;
+    const inviterCount = inviterInvites + inviterResends;
     if (orgCount >= INVITE_RATE_LIMIT_PER_HOUR) {
       throw new BadRequestException("This organization has sent too many invitations in the last hour — try again later.");
     }
@@ -467,12 +487,33 @@ export class OrganizationsService {
     return updated;
   }
 
-  async enableMember(organizationId: string, actingUserId: string, membershipId: string) {
-    const membership = await this.prisma.organizationUser.findUnique({ where: { id: membershipId } });
-    if (!membership || membership.organizationId !== organizationId) throw new NotFoundException("Membership not found.");
-    if (membership.status !== "DISABLED") throw new BadRequestException(`Cannot enable a membership with status "${membership.status}".`);
+  /**
+   * Re-enabling restores the membership's role, so it follows the same rules as granting
+   * that role (only an owner restores an owner; no role beyond your own). A membership
+   * that came from an invitation nobody ever accepted (invite -> revoke) can't be enabled:
+   * that would make someone a member without their consent. Send a new invitation instead.
+   */
+  async enableMember(organizationId: string, actingUserId: string, actingIsPlatformAdmin: boolean, membershipId: string) {
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const membership = await tx.organizationUser.findUnique({ where: { id: membershipId }, include: { role: true } });
+        if (!membership || membership.organizationId !== organizationId) throw new NotFoundException("Membership not found.");
+        if (membership.status !== "DISABLED") throw new BadRequestException(`Cannot enable a membership with status "${membership.status}".`);
 
-    const updated = await this.prisma.organizationUser.update({ where: { id: membershipId }, data: { status: "ACTIVE" }, include: { role: true, user: true } });
+        const [invitations, accepted] = await Promise.all([
+          tx.organizationInvitation.count({ where: { membershipId } }),
+          tx.organizationInvitation.count({ where: { membershipId, acceptedAt: { not: null } } }),
+        ]);
+        if (invitations > 0 && accepted === 0) {
+          throw new BadRequestException("This person never accepted their invitation — send them a new invitation instead.");
+        }
+
+        await this.assertCanGrantRole(tx, organizationId, actingUserId, actingIsPlatformAdmin, membership.role);
+
+        return tx.organizationUser.update({ where: { id: membershipId }, data: { status: "ACTIVE" }, include: { role: true, user: true } });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
 
     await this.auditLog.record({
       organizationId,

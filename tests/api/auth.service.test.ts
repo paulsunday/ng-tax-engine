@@ -423,7 +423,7 @@ describe("AuthService MFA setup/enable/disable", () => {
 describe("AuthService.inspectInvitation / acceptInvitation", () => {
   function invitationMocks() {
     const { prisma, jwt, auditLog, mfa, email } = makeMocks();
-    prisma.organizationInvitation = { findUnique: jest.fn(), update: jest.fn() };
+    prisma.organizationInvitation = { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) };
     return { prisma, jwt, auditLog, mfa, email };
   }
 
@@ -509,7 +509,10 @@ describe("AuthService.inspectInvitation / acceptInvitation", () => {
       where: { id: "membership-1" },
       data: { status: "ACTIVE", joinedAt: expect.any(Date) },
     });
-    expect(prisma.organizationInvitation.update).toHaveBeenCalledWith({ where: { id: "inv-1" }, data: { acceptedAt: expect.any(Date) } });
+    expect(prisma.organizationInvitation.updateMany).toHaveBeenCalledWith({
+      where: { id: "inv-1", acceptedAt: null, revokedAt: null, expiresAt: { gt: expect.any(Date) } },
+      data: { acceptedAt: expect.any(Date) },
+    });
     expect(result.accessToken).toBe("signed.jwt.token");
     expect(auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: "ACCEPT_INVITATION", userId: "user-1" }));
   });
@@ -540,6 +543,20 @@ describe("AuthService.inspectInvitation / acceptInvitation", () => {
     const service = new AuthService(prisma, jwt, auditLog, mfa, email);
 
     await expect(service.acceptInvitation("token", undefined, "whatever-password")).rejects.toThrow(BadRequestException);
+  });
+
+  test("acceptInvitation lets only one of two simultaneous requests with the same token through", async () => {
+    const { prisma, jwt, auditLog, mfa, email } = invitationMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue(liveInvitation); // both requests read it as live
+    prisma.organizationInvitation.updateMany.mockResolvedValue({ count: 0 }); // the other request already claimed it
+    prisma.user.update = jest.fn();
+    prisma.organizationUser.update = jest.fn();
+    const service = new AuthService(prisma, jwt, auditLog, mfa, email);
+
+    await expect(service.acceptInvitation("token", undefined, "a-new-password-123")).rejects.toThrow(BadRequestException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.organizationUser.update).not.toHaveBeenCalled();
+    expect(auditLog.record).not.toHaveBeenCalled();
   });
 
   test("acceptInvitation refuses a deactivated or erased account even with a technically-valid token", async () => {

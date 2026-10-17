@@ -74,6 +74,6 @@ export class OrganizationsController {
   @RequirePermissions(PERMISSIONS.MANAGE_USERS)
   async enableMember(@CurrentUser() user: JwtPayload, @Param("membershipId") membershipId: string) {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");
-    return this.organizations.enableMember(user.organizationId, user.sub, membershipId);
+    return this.organizations.enableMember(user.organizationId, user.sub, user.isPlatformAdmin, membershipId);
   }
 }
