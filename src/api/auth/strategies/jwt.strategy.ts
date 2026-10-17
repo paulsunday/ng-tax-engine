@@ -1,11 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import { PrismaService } from "../../prisma/prisma.service";
 import { JwtPayload } from "../../common/rbac.constants";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       throw new Error(
@@ -20,10 +21,48 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  /**
+   * Re-fetches the live user on every authenticated request rather than trusting the
+   * signed payload's role/flags for the token's full 8h lifetime (security audit finding,
+   * 2026-10-17): without this, a deactivated account, a revoked isPlatformAdmin/
+   * isTaxRuleApprover flag, or a role reassignment would silently keep its OLD access until
+   * the token naturally expired — stale authorization data from a cryptographically valid
+   * token. PermissionsGuard already does the equivalent live lookup for permission grants
+   * (see its own docstring); this closes the same gap one layer up, for the account-level
+   * flags that guard reads directly off request.user. organizationId/roleId in the
+   * RETURNED payload always reflect the CURRENT row, not the token's original claims.
+   */
   async validate(payload: JwtPayload): Promise<JwtPayload> {
-    // Returned value is attached to request.user by passport. Re-fetching the user from
-    // the DB on every request (to catch disabled/removed accounts) is deferred to Phase 2+
-    // for now; Phase 1 trusts a valid, unexpired signature.
-    return payload;
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, isActive: true, isPlatformAdmin: true, isTaxRuleApprover: true },
+    });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException("Account is no longer active.");
+    }
+
+    let roleId = payload.roleId;
+    let roleName = payload.roleName;
+    if (payload.organizationId) {
+      const membership = await this.prisma.organizationUser.findUnique({
+        where: { organizationId_userId: { organizationId: payload.organizationId, userId: user.id } },
+        include: { role: { select: { name: true } } },
+      });
+      if (!membership || membership.status === "DISABLED") {
+        throw new UnauthorizedException("No longer an active member of this organization.");
+      }
+      roleId = membership.roleId;
+      roleName = membership.role.name;
+    }
+
+    return {
+      sub: user.id,
+      email: user.email,
+      organizationId: payload.organizationId,
+      roleId,
+      roleName,
+      isPlatformAdmin: user.isPlatformAdmin,
+      isTaxRuleApprover: user.isTaxRuleApprover,
+    };
   }
 }
