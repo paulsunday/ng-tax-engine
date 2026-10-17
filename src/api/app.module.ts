@@ -39,6 +39,7 @@ import { AiToolsModule } from "./ai-tools/ai-tools.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { HealthModule } from "./health/health.module";
 import { TaxRuleGovernanceModule } from "./tax-rule-governance/tax-rule-governance.module";
+import { IntegrationsModule } from "./integrations/integrations.module";
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { TaxRuleGovernanceModule } from "./tax-rule-governance/tax-rule-governan
     SchedulerModule,
     HealthModule,
     TaxRuleGovernanceModule,
+    IntegrationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

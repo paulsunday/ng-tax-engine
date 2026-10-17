@@ -559,6 +559,9 @@ model Company {
 
   // Phases 7-10 — notifications
   notifications     Notification[]
+
+  // External systems (e.g. the tenant-billing ISP dashboard) linked to this company
+  integrationConnections IntegrationConnection[]
 }
 
 // A company may have zero or many branches, each in its own state, each potentially
@@ -1501,4 +1504,45 @@ model Notification {
 
   @@index([organizationId, userId, readAt])
   @@index([companyId, category])
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// Integrations — an external system (e.g. Netwave's tenant-billing ISP admin dashboard)
+// linked to ONE company. The external system authenticates with a long random key, of
+// which only the SHA-256 hash is stored (same principle as passwordResetTokenHash): a
+// database read alone can never yield a usable key. A key can read that company's
+// compliance summary and mint single-use sign-in codes for users who ALREADY hold an
+// active membership in the company's organization — it can never create users or grant
+// access anyone doesn't already have.
+// ═════════════════════════════════════════════════════════════════════════
+
+model IntegrationConnection {
+  id              String    @id @default(cuid())
+  organizationId  String    // tenant boundary, denormalised from Company for direct filtering
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  label           String    // e.g. "Netwave billing dashboard"
+  keyHash         String    @unique
+  keyPrefix       String    // first characters of the key, shown in the UI so a key can be recognised without being stored
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+
+  ssoCodes        IntegrationSsoCode[]
+
+  @@index([companyId])
+}
+
+// Single-use, short-lived sign-in code minted by an integration for one existing user.
+// Only the hash is stored; usedAt is set atomically on exchange so a code works once.
+model IntegrationSsoCode {
+  id           String    @id @default(cuid())
+  connectionId String
+  connection   IntegrationConnection @relation(fields: [connectionId], references: [id])
+  userId       String
+  codeHash     String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
 }

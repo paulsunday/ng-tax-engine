@@ -9,6 +9,7 @@ import { JwtPayload, ROLES } from "../common/rbac.constants";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { MfaService } from "./mfa.service";
+import { hashSecret } from "../integrations/integrations.service";
 
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -273,6 +274,53 @@ export class AuthService {
       data: { passwordHash, passwordResetTokenHash: null, passwordResetExpiresAt: null },
     });
     await this.auditLog.record({ organizationId: null, userId: user.id, action: "RESET_PASSWORD", objectType: "User", objectId: user.id });
+  }
+
+  /**
+   * Exchanges a single-use sign-in code minted by an integration (IntegrationsService.
+   * createSsoLink) for a session token scoped to the connection's organization. MFA is
+   * still enforced: a user with MFA enabled must supply their TOTP code here too — signing
+   * in through another system never downgrades an account's second factor. A failed MFA
+   * attempt does NOT consume the code, so the user can retry within its short lifetime.
+   */
+  async exchangeSsoCode(code: string, totpCode?: string): Promise<{ accessToken: string; companyId: string }> {
+    const INVALID = "This sign-in link is invalid or has expired. Open Netwave Books again from your dashboard.";
+    const ssoCode = await this.prisma.integrationSsoCode.findUnique({ where: { codeHash: hashSecret(code) }, include: { connection: true } });
+    if (!ssoCode || ssoCode.usedAt || ssoCode.expiresAt < new Date() || ssoCode.connection.revokedAt) {
+      throw new UnauthorizedException(INVALID);
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: ssoCode.userId } });
+    if (!user || !user.isActive || user.erasedAt) throw new UnauthorizedException(INVALID);
+
+    if (user.mfaEnabled) {
+      if (!user.mfaSecret) throw new UnauthorizedException("MFA is enabled but no secret is provisioned — contact an administrator.");
+      if (!totpCode) throw new UnauthorizedException("MFA code required.");
+      if (!this.mfa.verify(totpCode, user.mfaSecret)) throw new UnauthorizedException("Invalid MFA code.");
+    }
+
+    // Atomic single use: only the request that flips usedAt from null wins a race.
+    const { count } = await this.prisma.integrationSsoCode.updateMany({ where: { id: ssoCode.id, usedAt: null }, data: { usedAt: new Date() } });
+    if (count !== 1) throw new UnauthorizedException(INVALID);
+
+    // Membership is re-checked at exchange time, not trusted from when the code was minted.
+    const { organizationId, companyId } = ssoCode.connection;
+    const membership = await this.prisma.organizationUser.findFirst({ where: { userId: user.id, organizationId, status: "ACTIVE" }, include: { role: true } });
+    if (!membership) throw new UnauthorizedException(INVALID);
+
+    await this.auditLog.record({
+      organizationId,
+      userId: user.id,
+      action: "LOGIN",
+      objectType: "User",
+      objectId: user.id,
+      reason: `Single sign-on via integration "${ssoCode.connection.label}"`,
+    });
+
+    return {
+      accessToken: this.signToken(user.id, user.email, organizationId, membership.roleId, membership.role.name, user.isPlatformAdmin, user.isTaxRuleApprover),
+      companyId,
+    };
   }
 
   private signToken(

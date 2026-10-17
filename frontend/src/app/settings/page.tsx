@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
 import { Button, Card, PageHeader } from "@/components/ui";
+import { ConnectedApps } from "@/components/ConnectedApps";
 
 function SettingsPage() {
   const { claims, logout } = useAuth();
@@ -57,6 +58,8 @@ function SettingsPage() {
         <h2 className="text-sm font-semibold mb-1">Profile</h2>
         <p className="text-sm text-muted">{claims?.email}</p>
       </Card>
+
+      {claims?.organizationId && <ConnectedApps />}
 
       <Card className="mb-6">
         <h2 className="text-sm font-semibold mb-2">Export my data</h2>

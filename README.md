@@ -1,4 +1,6 @@
-# NG Tax Engine
+# Netwave Books
+
+*by Netwave Tech Labs (formerly "NG Tax Engine")*
 
 A multi-tenant platform **built for accountants, auditors, and tax professionals** —
 it's the tool they use to make accounting, audit support, and tax filing fast and
@@ -106,6 +108,26 @@ isolated — it does not stop the sweep for the rest.
 - **RBAC**: permissions are DB rows (`Permission`/`RolePermission`), not hardcoded — see
   `src/api/common/rbac.constants.ts` for the default role→permission grants and
   `PermissionsGuard` for enforcement.
+
+## Integrations (connected apps)
+
+An external system (e.g. Netwave's tenant-billing ISP admin dashboard) can be linked to
+ONE company:
+
+1. A company owner/admin creates a connection key in **Settings → Connected apps**
+   (`POST /companies/:companyId/integrations`). The key (`nwb_…`) is shown once; only its
+   SHA-256 hash is stored. Revoke with `POST /companies/:companyId/integrations/:id/revoke`.
+2. The external system calls, server-to-server, with `Authorization: Bearer nwb_…`:
+   - `GET /integrations/v1/summary` — read-only compliance snapshot: open calendar
+     deadlines, overdue count, latest VAT/CIT returns (a withheld liability stays `null`),
+     unread notification count, and a deep link into the app.
+   - `POST /integrations/v1/sso` `{ "email": "..." }` — for a user who ALREADY has an active
+     membership in the company's organization, returns `{ url, expiresAt }`: a single-use,
+     2-minute sign-in link (`/sso#code=…`, code in the fragment so it never hits logs).
+3. The browser opens the link; `/sso` exchanges the code at `POST /auth/sso/exchange`.
+   MFA is still enforced for users who have it enabled.
+
+A key can never create users or grant access a person doesn't already have.
 
 ## Setup
 

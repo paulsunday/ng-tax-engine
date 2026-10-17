@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NG Tax Engine",
+  title: "Netwave Books",
   description: "Built for accountants, auditors, and tax professionals — accounting, audit support, and tax filing made fast and reliable.",
 };
 
@@ -29,6 +29,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <Nav />
           <main className="flex-1">{children}</main>
+          <footer className="border-t border-border">
+            <div className="max-w-6xl mx-auto px-6 py-4 text-xs text-muted">Netwave Books · by Netwave Tech Labs</div>
+          </footer>
         </AuthProvider>
       </body>
     </html>

@@ -10,6 +10,7 @@ import { MfaCodeDto } from "./dto/mfa-code.dto";
 import { SwitchOrganizationDto } from "./dto/switch-organization.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { RequestPasswordResetDto, ResetPasswordDto } from "./dto/password-reset.dto";
+import { SsoExchangeDto } from "./dto/sso-exchange.dto";
 
 // 5 attempts/minute per IP on every credential-bearing auth endpoint — brute-force and
 // credential-stuffing protection (brief §41). Tighter than the app-wide default limit.
@@ -87,5 +88,12 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto.token, dto.newPassword);
     return { reset: true };
+  }
+
+  @Post("sso/exchange")
+  @HttpCode(200)
+  @Throttle(AUTH_THROTTLE)
+  exchangeSsoCode(@Body() dto: SsoExchangeDto) {
+    return this.authService.exchangeSsoCode(dto.code, dto.totpCode);
   }
 }
