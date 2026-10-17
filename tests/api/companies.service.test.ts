@@ -2,7 +2,22 @@ import { NotFoundException } from "@nestjs/common";
 import { CompaniesService } from "../../src/api/companies/companies.service";
 
 function makeMocks() {
-  const prisma: any = { company: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() } };
+  const emptyFindMany = () => ({ findMany: jest.fn().mockResolvedValue([]) });
+  const prisma: any = {
+    company: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+    customer: emptyFindMany(),
+    supplier: emptyFindMany(),
+    invoice: emptyFindMany(),
+    expense: emptyFindMany(),
+    account: emptyFindMany(),
+    journalEntry: emptyFindMany(),
+    asset: emptyFindMany(),
+    bankAccount: emptyFindMany(),
+    employee: emptyFindMany(),
+    taxReturn: emptyFindMany(),
+    complianceCalendarEntry: emptyFindMany(),
+    document: emptyFindMany(),
+  };
   const auditLog: any = { record: jest.fn() };
   return { prisma, auditLog };
 }
@@ -76,5 +91,43 @@ describe("CompaniesService tenant isolation (brief §4)", () => {
     expect(auditLog.record).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: "org-A", userId: "user-1", action: "CREATE", objectType: "Company" })
     );
+  });
+});
+
+describe("CompaniesService.exportBusinessRecords", () => {
+  test("refuses to export a company belonging to a different organization", async () => {
+    const { prisma, auditLog } = makeMocks();
+    prisma.company.findUnique.mockResolvedValue({ id: "c1", organizationId: "org-OTHER", name: "Theirs Ltd" });
+    const service = new CompaniesService(prisma, auditLog);
+
+    await expect(service.exportBusinessRecords("org-A", "user-1", "c1")).rejects.toThrow(NotFoundException);
+    expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+  });
+
+  test("scopes every underlying query by companyId and writes an EXPORT audit log entry", async () => {
+    const { prisma, auditLog } = makeMocks();
+    prisma.company.findUnique.mockResolvedValue({ id: "c1", organizationId: "org-A", name: "Mine Ltd" });
+    const service = new CompaniesService(prisma, auditLog);
+
+    const result = await service.exportBusinessRecords("org-A", "user-1", "c1");
+
+    expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { companyId: "c1" } }));
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { companyId: "c1" } }));
+    expect(prisma.employee.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { companyId: "c1" } }));
+    expect(result.company.name).toBe("Mine Ltd");
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org-A", userId: "user-1", action: "EXPORT", objectType: "Company", objectId: "c1" })
+    );
+  });
+
+  test("document export never selects storagePath (server-internal detail, not part of the record)", async () => {
+    const { prisma, auditLog } = makeMocks();
+    prisma.company.findUnique.mockResolvedValue({ id: "c1", organizationId: "org-A", name: "Mine Ltd" });
+    const service = new CompaniesService(prisma, auditLog);
+
+    await service.exportBusinessRecords("org-A", "user-1", "c1");
+
+    const call = prisma.document.findMany.mock.calls[0][0];
+    expect(call.select.storagePath).toBeUndefined();
   });
 });

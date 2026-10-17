@@ -137,7 +137,49 @@ function CompanyDetail() {
           </table>
         )}
       </section>
+
+      <ExportBusinessRecords companyId={companyId} />
     </div>
+  );
+}
+
+function ExportBusinessRecords({ companyId }: { companyId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function exportAndDownload() {
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await api.get(`/companies/${companyId}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `business-records-${companyId}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Export failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-10 border rounded p-4">
+      <h2 className="text-sm font-semibold mb-2">Export business records</h2>
+      <p className="text-xs text-gray-500 mb-3">
+        Downloads this company&apos;s full business records as JSON — customers, suppliers, invoices, expenses,
+        chart of accounts, journal entries, assets, bank accounts, employees, tax returns, compliance calendar, and
+        document metadata. This is the organization&apos;s own business data, distinct from an individual user&apos;s
+        personal NDPA export under Settings.
+      </p>
+      <button onClick={exportAndDownload} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+        {busy ? "Exporting…" : "Export business records"}
+      </button>
+      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+    </section>
   );
 }
 

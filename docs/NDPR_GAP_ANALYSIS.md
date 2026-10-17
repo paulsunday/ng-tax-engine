@@ -35,7 +35,7 @@ up — this is not a toy dataset once production tenants exist.
 | 8 | Data subject rights — access (right to obtain a copy of one's data) | **Done** | `GET /users/me/export-data` (`UsersService.exportMyData`) returns the caller's own profile, organization memberships, and audit-log history. Scoped deliberately to the platform *user's* own data — see the endpoint's docstring for why Employee/Customer/Supplier records are out of scope (those belong to the organization, not this user). |
 | 9 | Data subject rights — erasure/rectification | **Done, with a documented policy** | `POST /users/me/request-erasure` anonymizes the account in place (never a hard delete) — see `docs/DATA_RETENTION_AND_ERASURE_POLICY.md` for the full reasoning and what is/isn't covered (tax/business records are explicitly NOT touched by this endpoint, by design). |
 | 10 | Data subject rights — portability | **Partially done** | The same export endpoint (#8) returns structured JSON, which satisfies the "machine-readable" part of portability for a user's own account data. No equivalent exists yet for exporting a company's own business records in bulk. |
-| 11 | Cross-border data transfer safeguards | **Needs verification — still the top open item** | Railway's hosting region for this deployment was set to `sfo` (US West) during this build (`railway status` output, `region: sfo`) — i.e. **Nigerian personal data is currently processed in a US data centre.** NDPA has cross-border-transfer provisions (adequacy decision / contractual safeguards / consent) that this has not been checked against. **Gap: this is a real, currently-live compliance exposure, not a hypothetical one** — disclosed in the Terms & Conditions (`frontend/src/app/terms/page.tsx` §4) in the meantime, but disclosure is not the same as resolution. |
+| 11 | Cross-border data transfer safeguards | **Mitigated, not legally cleared** | Production (API, Postgres, frontend) was migrated 2026-10-17 from `sfo` (US West) to `eu-west` (Amsterdam) — Railway has no African region, so this is the nearest available option, not a true in-Nigeria deployment. Migration was verified: full `pg_dump`/`pg_restore` of the production database with row-count parity confirmed across all tables, document-storage volume content confirmed intact post-move, and live login/API/frontend checks passed against the new region. **This narrows but does not close the gap** — EU hosting still constitutes a cross-border transfer under NDPA and still needs a qualified reviewer to confirm it against NDPA's actual adequacy/safeguard mechanisms (e.g. standard contractual clauses), same as US hosting did. Disclosed in the Terms & Conditions (`frontend/src/app/terms/page.tsx` §4) in the meantime. |
 | 12 | Retention policy / data lifecycle | **Policy documented for Users; not yet extended to other models** | `docs/DATA_RETENTION_AND_ERASURE_POLICY.md` resolves the User-erasure case. Documents, audit logs, and tax returns still accumulate indefinitely with no automated lifecycle — a real researched retention schedule per data type (reconciled against statutory tax-record retention law) is still an open item for those models specifically. |
 | 13 | Vendor/processor due diligence (Railway, and any future email/SMS provider) | **Not performed** | No data-processing agreement review with Railway was performed as part of this build. |
 | 14 | Consent management (where consent, not legal obligation, is the basis) | **Not applicable yet** | No marketing/analytics/non-essential processing exists in the product today that would need consent UI — revisit if any is added. |
@@ -45,20 +45,20 @@ up — this is not a toy dataset once production tenants exist.
 **This platform is still not NDPR/NDPA-compliant as a finished state**, but the gap has
 narrowed materially since the first pass. Data-subject access (#8), erasure (#9), a breach
 runbook (#5), and a DPIA draft (#7) now all exist and are implemented/documented, not just
-flagged as missing. **The one currently-live, concrete exposure remains unresolved**:
-production data is hosted in a US region, not confirmed against Nigeria's cross-border
-transfer rules — this is the single biggest remaining blocker, and it is a fact about the
-running system that only a hosting decision (not more code) can close. DPO appointment and
-DPIA sign-off also remain organisational steps outside what this codebase can do on its own.
+flagged as missing. **Update 2026-10-17**: production hosting moved from US (`sfo`) to EU
+(`eu-west`) at your direction — see item #11. This is a real mitigation (EU has its own
+mature data-protection framework, unlike the prior US hosting with no equivalent review at
+all), but it is not the same as legal clearance: NDPA's cross-border rules still apply to EU
+hosting, and no qualified NDPA reviewer has signed off on either the old or new arrangement.
+DPO appointment and DPIA sign-off also remain organisational steps outside what this codebase
+can do on its own.
 
 ## Recommended next steps, in order
 
-1. **Decide on data residency** — either confirm (with NDPC guidance / legal counsel) that the
-   current US hosting region is compliant with appropriate safeguards, or migrate the Railway
-   Postgres + API service to an EU/available Nigeria-adjacent region. This is the single
-   highest-priority item because it's a live fact about the running system, not a missing
-   feature. **This is a decision for you, not something to execute unilaterally** — a region
-   migration has real cost and downtime implications.
+1. **Get the EU hosting arrangement reviewed against NDPA's actual cross-border mechanisms**
+   (adequacy / standard contractual clauses / consent) by a qualified reviewer — the region
+   move (item #11) reduced the exposure but did not legally resolve it. A true in-Nigeria
+   deployment remains unavailable since Railway has no African region.
 2. Appoint a DPO (or formally designate a responsible individual) to review and sign off on
    `docs/DPIA.md`, and to be named in `docs/BREACH_NOTIFICATION_RUNBOOK.md`'s "who does what."
 3. Extend the retention policy (`docs/DATA_RETENTION_AND_ERASURE_POLICY.md`) beyond the User

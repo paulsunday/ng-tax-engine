@@ -19,10 +19,12 @@ professional**, so every real tax calculation today correctly returns `PENDING_R
 rather than a number — this is a deliberate gate, not a bug, but it means the system cannot
 yet be used to file a real return, and it is **not something this build can do on its own**
 (the governance system is structurally designed so AI cannot self-approve); (2) the
-**NDPR/NDPA gap analysis found a live, unresolved data-residency exposure** (production
-hosted in a US region) — also not resolved unilaterally this pass, since a region migration
-is a real infrastructure decision with cost/downtime implications that belongs to you, not
-to an autonomous build step. None of this was hidden in earlier updates — see
+**NDPR/NDPA data-residency exposure flagged earlier was mitigated on 2026-10-17** — production
+was migrated from a US region (`sfo`) to EU (`eu-west`, Railway has no African region) at your
+explicit direction, with the database migration verified via row-count parity and the
+documents volume confirmed intact post-move. This narrows the exposure but does not
+constitute legal clearance — NDPA's cross-border rules still apply to EU hosting and still
+need a qualified reviewer's sign-off. None of this was hidden in earlier updates — see
 `docs/NDPR_GAP_ANALYSIS.md` and this report's section 18/27. Data-subject access, erasure,
 a breach-notification runbook, and a DPIA draft are now all built/written (see section 18).
 Admin tax-rule governance now has a real UI — a qualified approver can actually click
@@ -91,9 +93,13 @@ rule, NDPA data export via `/settings`, and the `/admin/tax-rules` governance UI
 restriction (verified the restriction itself; did not grant platform-admin even on the
 synthetic demo account to view the unlocked state, since that's a real privilege escalation
 the auto-mode classifier correctly declined).
-**Explicitly not built yet**: a bulk business-record export (distinct from the personal
-NDPA export), and an automated frontend test suite (everything above was verified by hand
-in a real browser, not via Playwright/Jest).
+**Bulk business-record export: done** (`GET /companies/:id/export`, `CompaniesService.exportBusinessRecords`) —
+customers, suppliers, invoices, expenses, chart of accounts, journal entries, assets, bank
+accounts, employees, tax returns, compliance calendar, and document metadata (never
+`storagePath`, a server-internal detail). Audit-logged as an `EXPORT` action. Distinct from
+the personal NDPA export (`/users/me/export-data`), same separation of concerns as before.
+**Still not built**: an automated frontend test suite beyond the two suites added so far
+(everything else above was verified by hand in a real browser, not via Playwright/Jest).
 **Org switching: DONE, verified.** `POST /auth/switch-organization`
 (`src/api/auth/auth.controller.ts`) re-issues a token scoped to an explicit target
 organization; tenant isolation (IDOR) covered by a dedicated test suite.
@@ -102,9 +108,12 @@ organization; tenant isolation (IDOR) covered by a dedicated test suite.
 
 **Mostly DONE, verified:**
 - Auth: JWT + bcrypt (12 rounds), MFA (TOTP via `otplib` 12.x), password reset (single-use
-  SHA-256-hashed token, 1h expiry, anti-enumeration generic response) — **honestly
-  incomplete**: no email provider is configured in this environment, so reset tokens are
-  logged via `Logger.warn`, never actually emailed. This is a documented gap, not hidden.
+  SHA-256-hashed token, 1h expiry, anti-enumeration generic response). Email delivery is now
+  wired (`src/api/email/email.service.ts`, SMTP-based — works with SES/SendGrid/Postmark/etc.)
+  but **no SMTP credentials are configured in production yet** — until `SMTP_HOST`/`SMTP_USER`/
+  `SMTP_PASSWORD`/`SMTP_FROM` are set, it falls back to the prior `Logger.warn` behavior rather
+  than failing silently. Supplying those credentials is an operator action (see `.env.example`),
+  not something this build can do on its own.
 - RBAC: ~20 permission keys, `PermissionsGuard` queried live per request.
 - CORS: explicit allowlist via `ALLOWED_ORIGINS`, no permissive default.
 - Rate limiting: global 100/min, 5/min on auth endpoints (`@nestjs/throttler`).
@@ -223,13 +232,14 @@ You're reading it.
    verify → submit-for-approval → approve → activate — now via a real UI at
    `/admin/tax-rules`, not just the API. Nothing calculates real money until this happens —
    by design, and not something this build can do for you.
-2. Resolve the NDPR/NDPA data-residency question (`docs/NDPR_GAP_ANALYSIS.md` §1) — either
-   confirm the current US hosting region is compliant with safeguards, or migrate region.
-   Your decision, not an autonomous one.
+2. ~~Migrate off US hosting~~ — **done 2026-10-17**, now `eu-west`. Still open: get a
+   qualified reviewer to confirm EU hosting satisfies NDPA's cross-border-transfer mechanisms
+   (`docs/NDPR_GAP_ANALYSIS.md` §11) — the region move reduced exposure, it didn't legally
+   clear it.
 3. Set up external uptime/alerting (`docs/MONITORING.md`) — a human decision, ~15 minutes of
    work once decided.
-4. ~~Build the frontend (S9)~~ — **done** for Stage 1 and Stage 2. Remaining frontend gaps:
-   a bulk business-record export and an automated test suite.
+4. ~~Build the frontend (S9)~~ — **done** for Stage 1 and Stage 2. ~~Bulk business-record
+   export~~ — **done**. Remaining frontend gap: a fuller automated test suite.
 5. ~~Build data-subject access/erasure endpoints and a breach-notification runbook~~ —
    **done**: `GET/POST /users/me/export-data`/`request-erasure`, plus
    `docs/BREACH_NOTIFICATION_RUNBOOK.md` and `docs/DPIA.md`. Both still need a DPO to
@@ -240,13 +250,14 @@ You're reading it.
    project holds itself to (a real browse of each state's live official site, not a
    secondary-source guess) — not something to rush to "done" in one pass.
 
-**Test suite at time of writing:** 58 backend suites, 400 backend tests, all passing; clean
-`tsc --noEmit` and `next build` (backend and frontend, 22 frontend routes). Frontend
-verified via real browser testing (both Stage 1 and Stage 2 flows) rather than an automated
-suite — no frontend test runner set up yet.
-**Production deploy:** backend `https://api-production-2b6a.up.railway.app`, `/health/ready`
-returning `{"status":"ok","database":"reachable"}` as of this report; frontend
-`https://frontend-production-e6cf.up.railway.app`, registration verified end-to-end via a
-direct cross-origin `fetch()` from that exact origin (201 Created, real token, ~1.2s) and
-via full UI-driven flow in a real browser (register → dashboard → company → VAT calculation
-→ validation) during local development against the same production backend.
+**Test suite at time of writing (2026-10-17):** 59 backend suites, 408 backend tests, all
+passing (`npm test`); clean `tsc --noEmit` on both backend and frontend. Frontend has two
+automated Jest/RTL suites (`api.ts` error handling, `ComplianceStateBadge` colors) plus
+verification by real browser testing for the rest (Stage 1 and Stage 2 flows) — not yet a
+full automated suite.
+**Production deploy:** backend `https://api-production-2b6a.up.railway.app`, frontend
+`https://frontend-production-e6cf.up.railway.app`, both on Railway region `eu-west`
+(migrated from `sfo` 2026-10-17, see `docs/NDPR_GAP_ANALYSIS.md` §11). `/health/ready`
+returns `{"status":"ok","database":"reachable"}`. Verified post-migration end-to-end in a
+real browser: login, VAT calculation (correctly `PENDING_RULE_APPROVAL`), document upload
+with MIME validation and category-gated OCR, and the new business-record export.

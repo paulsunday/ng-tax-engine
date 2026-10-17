@@ -30,4 +30,11 @@ export class CompaniesController {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");
     return this.companies.getOneOrThrow(user.organizationId, companyId);
   }
+
+  @Get(":companyId/export")
+  @RequirePermissions(PERMISSIONS.EXPORT_REPORTS)
+  exportBusinessRecords(@CurrentUser() user: JwtPayload, @Param("companyId") companyId: string) {
+    if (!user.organizationId) throw new ForbiddenException("No organization context.");
+    return this.companies.exportBusinessRecords(user.organizationId, user.sub, companyId);
+  }
 }

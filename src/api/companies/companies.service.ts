@@ -59,4 +59,85 @@ export class CompaniesService {
     }
     return company;
   }
+
+  /**
+   * Bulk export of a company's own business records — distinct from a platform user's
+   * personal NDPA export (UsersService.exportMyData), which deliberately does NOT include
+   * these (see that method's docstring). This is the organization's own data about itself
+   * and its counterparties, not a data-subject-rights mechanism.
+   * Document rows are included as metadata only — storagePath is a server-internal detail,
+   * not something the exported record should leak.
+   */
+  async exportBusinessRecords(organizationId: string, actingUserId: string, companyId: string) {
+    const company = await this.getOneOrThrow(organizationId, companyId);
+
+    const [
+      customers,
+      suppliers,
+      invoices,
+      expenses,
+      accounts,
+      journalEntries,
+      assets,
+      bankAccounts,
+      employees,
+      taxReturns,
+      complianceEntries,
+      documents,
+    ] = await Promise.all([
+      this.prisma.customer.findMany({ where: { companyId } }),
+      this.prisma.supplier.findMany({ where: { companyId } }),
+      this.prisma.invoice.findMany({ where: { companyId }, include: { items: true } }),
+      this.prisma.expense.findMany({ where: { companyId }, include: { items: true } }),
+      this.prisma.account.findMany({ where: { companyId } }),
+      this.prisma.journalEntry.findMany({ where: { companyId }, include: { lines: true } }),
+      this.prisma.asset.findMany({ where: { companyId } }),
+      this.prisma.bankAccount.findMany({ where: { companyId } }),
+      this.prisma.employee.findMany({ where: { companyId }, include: { payeCalculations: true } }),
+      this.prisma.taxReturn.findMany({ where: { companyId } }),
+      this.prisma.complianceCalendarEntry.findMany({ where: { companyId } }),
+      this.prisma.document.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          category: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+          checksumSha256: true,
+          linkedEntityType: true,
+          linkedEntityId: true,
+          ocrStatus: true,
+          ocrExtractedData: true,
+          uploadedBy: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    await this.auditLog.record({
+      organizationId,
+      userId: actingUserId,
+      action: "EXPORT",
+      objectType: "Company",
+      objectId: companyId,
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      company,
+      customers,
+      suppliers,
+      invoices,
+      expenses,
+      accounts,
+      journalEntries,
+      assets,
+      bankAccounts,
+      employees,
+      taxReturns,
+      complianceEntries,
+      documents,
+    };
+  }
 }

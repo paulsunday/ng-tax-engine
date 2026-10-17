@@ -4,6 +4,7 @@ import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditLogService } from "../audit-log/audit-log.service";
+import { EmailService } from "../email/email.service";
 import { JwtPayload, ROLES } from "../common/rbac.constants";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
@@ -24,7 +25,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly auditLog: AuditLogService,
-    private readonly mfa: MfaService
+    private readonly mfa: MfaService,
+    private readonly email: EmailService
   ) {}
 
   /**
@@ -218,13 +220,10 @@ export class AuthService {
    * persisted — identical principle to passwordHash: a database read alone can never
    * yield a usable token.
    *
-   * KNOWN GAP (mandate §11, documented rather than faked): there is no email provider
-   * configured in this environment (same "IN_APP only" limitation as NotificationsService
-   * elsewhere in this app), so the reset link is NOT actually emailed to the user — it is
-   * logged server-side instead. This method's own logic (token generation, hashing,
-   * expiry, single-use consumption) is real and correct; only the delivery channel is
-   * missing. Wire a real provider (SES/SendGrid/Postmark) and replace the logger.warn call
-   * below with an actual send before relying on this in production.
+   * Delivery: sends via EmailService when SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_FROM are
+   * all configured. If any are missing, falls back to the prior honest behavior — the token
+   * is logged server-side instead of emailed, rather than silently failing or pretending to
+   * have sent something.
    *
    * Always returns the same generic response regardless of whether the email exists, to
    * avoid confirming/denying account existence to an unauthenticated caller.
@@ -241,12 +240,21 @@ export class AuthService {
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordResetTokenHash, passwordResetExpiresAt } });
     await this.auditLog.record({ organizationId: null, userId: user.id, action: "REQUEST_PASSWORD_RESET", objectType: "User", objectId: user.id });
 
-    // NOT a real email send — see docstring. Logged so the flow is at least usable/testable
-    // by an operator with log access until a real email provider is wired up.
-    this.logger.warn(
-      `Password reset requested for ${email} — no email provider configured, so this token is NOT being emailed. ` +
-        `Reset link (deliver manually if needed): /reset-password?token=${token} (expires ${passwordResetExpiresAt.toISOString()})`
-    );
+    const resetUrl = `${process.env.FRONTEND_URL ?? ""}/reset-password?token=${token}`;
+    const { sent } = await this.email.send({
+      to: email,
+      subject: "Reset your password",
+      text: `A password reset was requested for your account. Use the link below to set a new password — it expires at ${passwordResetExpiresAt.toISOString()}.\n\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+    });
+
+    if (!sent) {
+      // No email provider configured (or the send failed) — logged so the flow is at least
+      // usable/testable by an operator with log access, same honest-gap pattern as before.
+      this.logger.warn(
+        `Password reset requested for ${email} — not emailed (no provider configured or send failed). ` +
+          `Reset link (deliver manually if needed): /reset-password?token=${token} (expires ${passwordResetExpiresAt.toISOString()})`
+      );
+    }
 
     return GENERIC_RESPONSE;
   }
