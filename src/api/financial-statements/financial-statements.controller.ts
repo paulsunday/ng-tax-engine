@@ -40,6 +40,17 @@ export class FinancialStatementsController {
     return this.statements.getBalanceSheet(user.organizationId, companyId, new Date(asOfDate), new Date(periodStart));
   }
 
+  @Get("statement-of-changes-in-equity")
+  statementOfChangesInEquity(
+    @CurrentUser() user: JwtPayload,
+    @Param("companyId") companyId: string,
+    @Query("periodStart") periodStart: string,
+    @Query("periodEnd") periodEnd: string
+  ) {
+    if (!user.organizationId) throw new ForbiddenException("No organization context.");
+    return this.statements.getStatementOfChangesInEquity(user.organizationId, companyId, new Date(periodStart), new Date(periodEnd));
+  }
+
   @Get("ar-aging")
   arAging(@CurrentUser() user: JwtPayload, @Param("companyId") companyId: string, @Query("asOfDate") asOfDate?: string) {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");

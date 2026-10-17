@@ -167,6 +167,73 @@ export class JournalService {
 
     return { rows, totalDebit, totalCredit, isBalanced: Math.abs(totalDebit - totalCredit) < 0.01 };
   }
+
+  /**
+   * The general-ledger drill-down for a single account: every POSTED line in date order
+   * with a running balance, plus an opening balance carried in from before periodStart (if
+   * given). This is the "account of debits and credits" view the trial balance's per-account
+   * totals don't show on their own.
+   */
+  async getAccountLedger(organizationId: string, companyId: string, accountId: string, periodStart?: Date, periodEnd?: Date) {
+    await this.companies.getOneOrThrow(organizationId, companyId);
+
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account || account.companyId !== companyId) throw new NotFoundException("Account not found.");
+
+    let openingBalanceNgn = 0;
+    if (periodStart) {
+      const dayBefore = new Date(periodStart);
+      dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+      const priorLines = await this.prisma.journalLine.findMany({
+        where: { accountId, journalEntry: { companyId, status: "POSTED", entryDate: { lte: dayBefore } } },
+      });
+      openingBalanceNgn = priorLines.reduce((bal, l) => bal + signedMovement(account.type, Number(l.debitNgn), Number(l.creditNgn)), 0);
+    }
+
+    const lines = await this.prisma.journalLine.findMany({
+      where: {
+        accountId,
+        journalEntry: {
+          companyId,
+          status: "POSTED",
+          ...(periodStart ? { entryDate: { gte: periodStart } } : {}),
+          ...(periodEnd ? { entryDate: { lte: periodEnd } } : {}),
+        },
+      },
+      include: { journalEntry: true },
+    });
+    lines.sort((a, b) => a.journalEntry.entryDate.getTime() - b.journalEntry.entryDate.getTime());
+
+    let runningBalanceNgn = round2(openingBalanceNgn);
+    const entries = lines.map((l) => {
+      runningBalanceNgn = round2(runningBalanceNgn + signedMovement(account.type, Number(l.debitNgn), Number(l.creditNgn)));
+      return {
+        journalEntryId: l.journalEntryId,
+        entryDate: l.journalEntry.entryDate,
+        description: l.journalEntry.description,
+        source: l.journalEntry.source,
+        debitNgn: Number(l.debitNgn),
+        creditNgn: Number(l.creditNgn),
+        runningBalanceNgn,
+      };
+    });
+
+    return {
+      accountId: account.id,
+      code: account.code,
+      name: account.name,
+      type: account.type,
+      openingBalanceNgn: round2(openingBalanceNgn),
+      entries,
+      closingBalanceNgn: runningBalanceNgn,
+    };
+  }
+}
+
+/** Credit-normal account types (LIABILITY/EQUITY/REVENUE) move up on a credit; everything else (ASSET/EXPENSE) moves up on a debit. */
+function signedMovement(accountType: string, debitNgn: number, creditNgn: number): number {
+  const creditNormal = accountType === "LIABILITY" || accountType === "EQUITY" || accountType === "REVENUE";
+  return creditNormal ? creditNgn - debitNgn : debitNgn - creditNgn;
 }
 
 function round2(n: number): number {

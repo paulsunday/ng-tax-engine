@@ -44,4 +44,23 @@ export class JournalController {
     if (!user.organizationId) throw new ForbiddenException("No organization context.");
     return this.journal.getTrialBalance(user.organizationId, companyId, asOfDate ? new Date(asOfDate) : undefined);
   }
+
+  @Get("accounts/:accountId/ledger")
+  @RequirePermissions(PERMISSIONS.VIEW_TRANSACTIONS)
+  accountLedger(
+    @CurrentUser() user: JwtPayload,
+    @Param("companyId") companyId: string,
+    @Param("accountId") accountId: string,
+    @Query("periodStart") periodStart?: string,
+    @Query("periodEnd") periodEnd?: string
+  ) {
+    if (!user.organizationId) throw new ForbiddenException("No organization context.");
+    return this.journal.getAccountLedger(
+      user.organizationId,
+      companyId,
+      accountId,
+      periodStart ? new Date(periodStart) : undefined,
+      periodEnd ? new Date(periodEnd) : undefined
+    );
+  }
 }

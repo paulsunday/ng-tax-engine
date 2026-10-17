@@ -2,7 +2,13 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CompaniesService } from "../companies/companies.service";
 import { JournalService } from "../journal/journal.service";
-import { buildProfitAndLoss, buildBalanceSheet, buildAgingReport, TrialBalanceRow } from "../../financial-statements/statementBuilder";
+import {
+  buildProfitAndLoss,
+  buildBalanceSheet,
+  buildAgingReport,
+  buildStatementOfChangesInEquity,
+  TrialBalanceRow,
+} from "../../financial-statements/statementBuilder";
 
 @Injectable()
 export class FinancialStatementsService {
@@ -53,6 +59,45 @@ export class FinancialStatementsService {
       this.getProfitAndLoss(organizationId, companyId, periodStartForProfit, asOfDate),
     ]);
     return buildBalanceSheet(trialBalance.rows as TrialBalanceRow[], pnl.netProfitBeforeTaxNgn);
+  }
+
+  /**
+   * The basic "capital account" roll-forward: opening capital + capital introduced -
+   * drawings + net profit for the period = closing capital. Shares the same
+   * start/end-trial-balance-difference approach as getProfitAndLoss, scoped to EQUITY
+   * accounts instead of REVENUE/EXPENSE.
+   */
+  async getStatementOfChangesInEquity(organizationId: string, companyId: string, periodStart: Date, periodEnd: Date) {
+    await this.companies.getOneOrThrow(organizationId, companyId);
+    const dayBeforeStart = new Date(periodStart);
+    dayBeforeStart.setUTCDate(dayBeforeStart.getUTCDate() - 1);
+
+    const [openingBalance, endBalance, pnl] = await Promise.all([
+      this.journal.getTrialBalance(organizationId, companyId, dayBeforeStart),
+      this.journal.getTrialBalance(organizationId, companyId, periodEnd),
+      this.getProfitAndLoss(organizationId, companyId, periodStart, periodEnd),
+    ]);
+
+    const openingMap = new Map(openingBalance.rows.map((r) => [r.accountId, r]));
+    const periodMovementRows: TrialBalanceRow[] = endBalance.rows
+      .filter((r) => r.type === "EQUITY")
+      .map((r) => {
+        const prior = openingMap.get(r.accountId);
+        return {
+          accountId: r.accountId,
+          code: r.code,
+          name: r.name,
+          type: r.type as TrialBalanceRow["type"],
+          debitNgn: r.debitNgn - (prior?.debitNgn ?? 0),
+          creditNgn: r.creditNgn - (prior?.creditNgn ?? 0),
+        };
+      });
+
+    return buildStatementOfChangesInEquity(
+      openingBalance.rows.filter((r) => r.type === "EQUITY") as TrialBalanceRow[],
+      periodMovementRows,
+      pnl.netProfitBeforeTaxNgn
+    );
   }
 
   async getArAging(organizationId: string, companyId: string, asOfDate: Date) {

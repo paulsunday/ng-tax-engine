@@ -1,4 +1,11 @@
-import { buildProfitAndLoss, buildBalanceSheet, buildAgingReport, TrialBalanceRow } from "../../src/financial-statements/statementBuilder";
+import {
+  buildProfitAndLoss,
+  buildBalanceSheet,
+  buildAgingReport,
+  buildStatementOfChangesInEquity,
+  TrialBalanceRow,
+} from "../../src/financial-statements/statementBuilder";
+import { SYSTEM_ACCOUNT_CODES } from "../../src/accounting/defaultChartOfAccounts";
 
 function row(overrides: Partial<TrialBalanceRow>): TrialBalanceRow {
   return { accountId: "a", code: "0000", name: "X", type: "ASSET", debitNgn: 0, creditNgn: 0, ...overrides };
@@ -84,5 +91,39 @@ describe("buildAgingReport", () => {
     const asOf = new Date("2026-07-01");
     const { items } = buildAgingReport([{ id: "1", partyName: "A", dueDate: new Date("2026-07-01"), outstandingNgn: 500 }], asOf);
     expect(items[0].bucket).toBe("CURRENT");
+  });
+});
+
+describe("buildStatementOfChangesInEquity", () => {
+  test("rolls forward opening capital + capital introduced - drawings + net profit = closing capital", () => {
+    const opening: TrialBalanceRow[] = [row({ accountId: "capital", code: "3000", name: "Share Capital", type: "EQUITY", creditNgn: 1_000_000 })];
+    const periodMovement: TrialBalanceRow[] = [
+      row({ accountId: "capital", code: "3000", name: "Share Capital", type: "EQUITY", creditNgn: 200_000 }), // capital introduced this period
+      row({ accountId: "drawings", code: SYSTEM_ACCOUNT_CODES.DRAWINGS, name: "Drawings", type: "EQUITY", debitNgn: 50_000 }), // owner withdrawal
+    ];
+
+    const stmt = buildStatementOfChangesInEquity(opening, periodMovement, 300_000);
+
+    expect(stmt.openingCapitalNgn).toBe(1_000_000);
+    expect(stmt.capitalIntroducedNgn).toBe(200_000);
+    expect(stmt.drawingsNgn).toBe(50_000);
+    expect(stmt.netProfitNgn).toBe(300_000);
+    expect(stmt.closingCapitalNgn).toBe(1_450_000); // 1,000,000 + 200,000 - 50,000 + 300,000
+  });
+
+  test("a net loss for the period reduces closing capital", () => {
+    const opening: TrialBalanceRow[] = [row({ accountId: "capital", code: "3000", name: "Share Capital", type: "EQUITY", creditNgn: 500_000 })];
+    const stmt = buildStatementOfChangesInEquity(opening, [], -100_000);
+    expect(stmt.closingCapitalNgn).toBe(400_000);
+  });
+
+  test("drawings are tracked separately from other equity movements, not netted together", () => {
+    const periodMovement: TrialBalanceRow[] = [
+      row({ accountId: "drawings", code: SYSTEM_ACCOUNT_CODES.DRAWINGS, name: "Drawings", type: "EQUITY", debitNgn: 20_000 }),
+    ];
+    const stmt = buildStatementOfChangesInEquity([], periodMovement, 0);
+    expect(stmt.drawingsNgn).toBe(20_000);
+    expect(stmt.capitalIntroducedNgn).toBe(0);
+    expect(stmt.byAccount.find((a) => a.code === SYSTEM_ACCOUNT_CODES.DRAWINGS)?.amountNgn).toBe(20_000);
   });
 });

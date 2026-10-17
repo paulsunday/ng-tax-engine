@@ -10,6 +10,8 @@
  * expense. This is documented here precisely so it's never mistaken for a tax-law rule.
  */
 
+import { SYSTEM_ACCOUNT_CODES } from "../accounting/defaultChartOfAccounts";
+
 export interface TrialBalanceRow {
   accountId: string;
   code: string;
@@ -156,4 +158,45 @@ export function buildAgingReport(items: AgingItem[], asOfDate: Date): { buckets:
   const buckets: AgingBucket[] = (Object.keys(bucketTotals) as AgingBucket["label"][]).map((label) => ({ label, amountNgn: bucketTotals[label] }));
 
   return { buckets, items: detailed };
+}
+
+export interface StatementOfChangesInEquity {
+  openingCapitalNgn: number;
+  capitalIntroducedNgn: number;
+  drawingsNgn: number;
+  netProfitNgn: number;
+  closingCapitalNgn: number;
+  byAccount: StatementLine[]; // movement per equity account during the period (Drawings included)
+}
+
+/**
+ * The basic "capital account" roll-forward: opening capital + capital introduced -
+ * drawings + net profit (for the period) = closing capital. Drawings is singled out by
+ * SYSTEM_ACCOUNT_CODES.DRAWINGS (debit-normal movement, so a debit this period means an
+ * owner/director withdrawal) rather than lumped into "capital introduced" with the other
+ * credit-normal equity accounts (e.g. Share Capital) — same reasoning as
+ * naturalBalance() above, just split per-account instead of netted.
+ */
+export function buildStatementOfChangesInEquity(
+  openingEquityRows: TrialBalanceRow[],
+  periodEquityMovementRows: TrialBalanceRow[],
+  netProfitNgn: number
+): StatementOfChangesInEquity {
+  const openingCapitalNgn = round2(openingEquityRows.reduce((a, r) => a + naturalBalance(r), 0));
+
+  const drawingsRows = periodEquityMovementRows.filter((r) => r.code === SYSTEM_ACCOUNT_CODES.DRAWINGS);
+  const otherEquityRows = periodEquityMovementRows.filter((r) => r.code !== SYSTEM_ACCOUNT_CODES.DRAWINGS);
+
+  const drawingsNgn = round2(drawingsRows.reduce((a, r) => a + round2(r.debitNgn - r.creditNgn), 0));
+  const capitalIntroducedNgn = round2(otherEquityRows.reduce((a, r) => a + naturalBalance(r), 0));
+  const closingCapitalNgn = round2(openingCapitalNgn + capitalIntroducedNgn - drawingsNgn + netProfitNgn);
+
+  const byAccount = periodEquityMovementRows.map((r) => ({
+    accountId: r.accountId,
+    code: r.code,
+    name: r.name,
+    amountNgn: r.code === SYSTEM_ACCOUNT_CODES.DRAWINGS ? round2(r.debitNgn - r.creditNgn) : naturalBalance(r),
+  }));
+
+  return { openingCapitalNgn, capitalIntroducedNgn, drawingsNgn, netProfitNgn: round2(netProfitNgn), closingCapitalNgn, byAccount };
 }

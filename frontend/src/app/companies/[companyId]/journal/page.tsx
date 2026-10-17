@@ -30,12 +30,43 @@ interface TrialBalance {
   isBalanced: boolean;
 }
 
+interface LedgerEntry {
+  journalEntryId: string;
+  entryDate: string;
+  description: string;
+  source: string;
+  debitNgn: number;
+  creditNgn: number;
+  runningBalanceNgn: number;
+}
+
+interface AccountLedger {
+  code: string;
+  name: string;
+  openingBalanceNgn: number;
+  entries: LedgerEntry[];
+  closingBalanceNgn: number;
+}
+
 function JournalPage() {
   const { companyId } = useParams<{ companyId: string }>();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
   const [showPost, setShowPost] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<TrialBalanceRow | null>(null);
+  const [ledger, setLedger] = useState<AccountLedger | null>(null);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+
+  function openLedger(row: TrialBalanceRow) {
+    setSelectedAccount(row);
+    setLedger(null);
+    setLedgerError(null);
+    api
+      .get<AccountLedger>(`/companies/${companyId}/journal/accounts/${row.accountId}/ledger`)
+      .then(setLedger)
+      .catch((err) => setLedgerError(err instanceof ApiError ? err.message : "Failed to load account ledger."));
+  }
 
   function reload() {
     api.get<Account[]>(`/companies/${companyId}/accounts`).then(setAccounts).catch(() => setAccounts([]));
@@ -87,7 +118,7 @@ function JournalPage() {
             </Thead>
             <tbody>
               {trialBalance.rows.map((r) => (
-                <Tr key={r.accountId}>
+                <Tr key={r.accountId} className="cursor-pointer" onClick={() => openLedger(r)}>
                   <Td className="font-mono text-xs">{r.code}</Td>
                   <Td>{r.name}</Td>
                   <Td>{r.debitNgn.toLocaleString()}</Td>
@@ -103,8 +134,98 @@ function JournalPage() {
               </tr>
             </tfoot>
           </Table>
+          <p className="text-xs text-muted mt-2">Click an account to see its full debit/credit ledger.</p>
         </>
       )}
+
+      {selectedAccount && (
+        <AccountLedgerPanel
+          account={selectedAccount}
+          ledger={ledger}
+          error={ledgerError}
+          onClose={() => {
+            setSelectedAccount(null);
+            setLedger(null);
+            setLedgerError(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AccountLedgerPanel({
+  account,
+  ledger,
+  error,
+  onClose,
+}: {
+  account: TrialBalanceRow;
+  ledger: AccountLedger | null;
+  error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-start justify-center pt-16 px-4 z-50" onClick={onClose}>
+      <div
+        className="bg-surface border border-border rounded-xl p-5 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="font-medium">
+              {account.code} — {account.name}
+            </div>
+            <div className="text-xs text-muted">Debit/credit ledger</div>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-foreground text-sm">
+            ✕
+          </button>
+        </div>
+
+        {error && <p className="text-danger text-sm">{error}</p>}
+        {!ledger && !error && <p className="text-muted text-sm">Loading…</p>}
+
+        {ledger && (
+          <>
+            <Table>
+              <Thead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Description</Th>
+                  <Th>Debit (₦)</Th>
+                  <Th>Credit (₦)</Th>
+                  <Th>Balance (₦)</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                <Tr>
+                  <Td colSpan={4} className="text-muted">
+                    Opening balance
+                  </Td>
+                  <Td>{ledger.openingBalanceNgn.toLocaleString()}</Td>
+                </Tr>
+                {ledger.entries.map((e) => (
+                  <Tr key={e.journalEntryId + e.entryDate}>
+                    <Td>{new Date(e.entryDate).toLocaleDateString()}</Td>
+                    <Td>{e.description}</Td>
+                    <Td>{e.debitNgn ? e.debitNgn.toLocaleString() : ""}</Td>
+                    <Td>{e.creditNgn ? e.creditNgn.toLocaleString() : ""}</Td>
+                    <Td>{e.runningBalanceNgn.toLocaleString()}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-medium border-t-2 border-border">
+                  <Td colSpan={4}>Closing balance</Td>
+                  <Td>{ledger.closingBalanceNgn.toLocaleString()}</Td>
+                </tr>
+              </tfoot>
+            </Table>
+            {ledger.entries.length === 0 && <p className="text-muted text-sm mt-2">No postings yet for this account.</p>}
+          </>
+        )}
+      </div>
     </div>
   );
 }

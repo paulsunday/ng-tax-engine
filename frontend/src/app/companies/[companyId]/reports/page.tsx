@@ -14,7 +14,7 @@ interface Account {
   type: string;
 }
 
-const REPORTS = ["Profit & Loss", "Balance Sheet", "AR Aging", "AP Aging", "Cash Movement"] as const;
+const REPORTS = ["Profit & Loss", "Balance Sheet", "Changes in Equity", "AR Aging", "AP Aging", "Cash Movement"] as const;
 type ReportName = (typeof REPORTS)[number];
 
 function ReportsPage() {
@@ -47,6 +47,7 @@ function ReportsPage() {
 
       {active === "Profit & Loss" && <ProfitAndLossReport companyId={companyId} />}
       {active === "Balance Sheet" && <BalanceSheetReport companyId={companyId} />}
+      {active === "Changes in Equity" && <EquityStatementReport companyId={companyId} />}
       {active === "AR Aging" && <AgingReport companyId={companyId} kind="ar-aging" label="customer" />}
       {active === "AP Aging" && <AgingReport companyId={companyId} kind="ap-aging" label="supplier" />}
       {active === "Cash Movement" && <CashMovementReport companyId={companyId} accounts={accounts} />}
@@ -155,6 +156,73 @@ function BalanceSheetReport({ companyId }: { companyId: string }) {
             <span>Total Equity</span>
             <span>₦{data.totalEquityNgn.toLocaleString()}</span>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EquityStatementReport({ companyId }: { companyId: string }) {
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [data, setData] = useState<{
+    openingCapitalNgn: number;
+    capitalIntroducedNgn: number;
+    drawingsNgn: number;
+    netProfitNgn: number;
+    closingCapitalNgn: number;
+    byAccount: { code: string; name: string; amountNgn: number }[];
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setError(null);
+    try {
+      setData(await api.get(`/companies/${companyId}/financial-statements/statement-of-changes-in-equity?periodStart=${periodStart}&periodEnd=${periodEnd}`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load statement of changes in equity.");
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-muted mb-3">The basic capital account roll-forward: opening capital + capital introduced − drawings + net profit = closing capital.</p>
+      <PeriodPicker periodStart={periodStart} periodEnd={periodEnd} setPeriodStart={setPeriodStart} setPeriodEnd={setPeriodEnd} onRun={load} />
+      {error && <p className="text-danger text-sm mb-3">{error}</p>}
+      {data && (
+        <div className="bg-surface border border-border rounded-xl p-5 text-sm flex flex-col gap-1.5">
+          <div className="flex justify-between">
+            <span className="text-muted">Opening capital</span>
+            <span>₦{data.openingCapitalNgn.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">Capital introduced</span>
+            <span>₦{data.capitalIntroducedNgn.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">Drawings</span>
+            <span>(₦{data.drawingsNgn.toLocaleString()})</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">Net profit for the period</span>
+            <span>₦{data.netProfitNgn.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between font-semibold border-t border-border pt-1.5 mt-1 text-base">
+            <span>Closing capital</span>
+            <span>₦{data.closingCapitalNgn.toLocaleString()}</span>
+          </div>
+
+          {data.byAccount.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="text-muted font-medium mb-1">Movement by equity account this period</div>
+              {data.byAccount.map((l) => (
+                <div key={l.code} className="flex justify-between pl-2">
+                  <span>{l.name}</span>
+                  <span>₦{l.amountNgn.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

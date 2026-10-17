@@ -37,6 +37,7 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccountSeed[] = [
   // Equity
   { code: "3000", name: "Share Capital", type: "EQUITY" },
   { code: "3100", name: "Retained Earnings", type: "EQUITY" },
+  { code: "3200", name: "Drawings", type: "EQUITY" }, // contra-equity (debit-normal movement), owner/director withdrawals
 
   // Revenue
   { code: "4000", name: "Sales Revenue", type: "REVENUE" },
@@ -65,4 +66,5 @@ export const SYSTEM_ACCOUNT_CODES = {
   SALES_REVENUE: "4000",
   DEPRECIATION_EXPENSE: "6400",
   CASH: "1000",
+  DRAWINGS: "3200",
 } as const;
