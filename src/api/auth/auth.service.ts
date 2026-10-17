@@ -340,8 +340,19 @@ export class AuthService {
       const { user, role } = invitation.membership;
       if (!user.isActive || user.erasedAt) throw INVALID_INVITATION_ERROR();
 
-      if (!user.passwordSet) {
-        if (!password) throw new BadRequestException("A password is required to accept this invitation.");
+      if (!user.passwordSet && !password) throw new BadRequestException("A password is required to accept this invitation.");
+
+      // Claim the invitation atomically before changing anything else. Two requests with
+      // the same token can both pass the read above; the row lock on this conditional
+      // UPDATE lets exactly one of them through, so a link really is single-use (and a new
+      // invitee's password can't be set twice by racing requests).
+      const claimed = await tx.organizationInvitation.updateMany({
+        where: { id: invitation.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        data: { acceptedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw INVALID_INVITATION_ERROR();
+
+      if (!user.passwordSet && password) {
         const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         await tx.user.update({
           where: { id: user.id },
@@ -349,7 +360,6 @@ export class AuthService {
         });
       }
 
-      await tx.organizationInvitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } });
       await tx.organizationUser.update({ where: { id: invitation.membershipId }, data: { status: "ACTIVE", joinedAt: new Date() } });
 
       return {

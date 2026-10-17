@@ -52,6 +52,7 @@ function makeMocks() {
       findMany: jest.fn(async ({ where: { roleId } }: any) => (ROLE_PERMISSIONS[roleId] ?? []).map((key) => ({ permission: { key } }))),
     },
     organization: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "org-1", name: "Acme Ltd" }) },
+    auditLog: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
   };
   const auditLog: any = { record: jest.fn() };
@@ -463,27 +464,106 @@ describe("OrganizationsService.disableMember — self-protection and owner locko
 describe("OrganizationsService.enableMember", () => {
   test("a membership belonging to a different organization is a 404", async () => {
     const { prisma, service } = makeMocks();
-    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "ORG-VICTIM" });
+    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "ORG-VICTIM", role: ROLE_ROWS.ACCOUNTANT });
 
-    await expect(service.enableMember("org-attacker", "attacker-1", "m-1")).rejects.toThrow(NotFoundException);
+    await expect(service.enableMember("org-attacker", "attacker-1", false, "m-1")).rejects.toThrow(NotFoundException);
   });
 
   test("refuses to enable a membership that isn't currently DISABLED", async () => {
     const { prisma, service } = makeMocks();
-    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "org-1", status: "ACTIVE" });
+    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "org-1", status: "ACTIVE", role: ROLE_ROWS.ACCOUNTANT });
 
-    await expect(service.enableMember("org-1", "owner-1", "m-1")).rejects.toThrow(BadRequestException);
+    await expect(service.enableMember("org-1", "owner-1", false, "m-1")).rejects.toThrow(BadRequestException);
   });
 
   test("flips a DISABLED membership directly back to ACTIVE", async () => {
     const { prisma, service, auditLog } = makeMocks();
-    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "org-1", status: "DISABLED" });
+    prisma.organizationUser.findUnique.mockResolvedValue({ id: "m-1", organizationId: "org-1", status: "DISABLED", role: ROLE_ROWS.ACCOUNTANT });
+    prisma.organizationUser.findFirst.mockResolvedValue({ roleId: "role-owner", role: ROLE_ROWS.COMPANY_OWNER });
     prisma.organizationUser.update.mockResolvedValue({ id: "m-1", status: "ACTIVE" });
 
-    await service.enableMember("org-1", "owner-1", "m-1");
+    await service.enableMember("org-1", "owner-1", false, "m-1");
 
     expect(prisma.organizationUser.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "ACTIVE" } }));
     expect(auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: "ENABLE_MEMBER" }));
+  });
+});
+
+describe("OrganizationsService.enableMember — consent and escalation", () => {
+  function disabled(role: { id: string; name: string }) {
+    return { id: "m-1", organizationId: "org-1", userId: "target-1", status: "DISABLED", role, roleId: role.id };
+  }
+
+  test("refuses to enable someone who never accepted their invitation (invite -> revoke -> enable)", async () => {
+    const { prisma, service } = makeMocks();
+    prisma.organizationUser.findUnique.mockResolvedValue(disabled(ROLE_ROWS.ACCOUNTANT));
+    prisma.organizationUser.findFirst.mockResolvedValue({ roleId: "role-owner", role: ROLE_ROWS.COMPANY_OWNER });
+    prisma.organizationInvitation.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0); // invited once, never accepted
+
+    await expect(service.enableMember("org-1", "owner-1", false, "m-1")).rejects.toThrow(/never accepted/);
+    expect(prisma.organizationUser.update).not.toHaveBeenCalled();
+  });
+
+  test("still re-enables a member who had accepted an earlier invitation", async () => {
+    const { prisma, service } = makeMocks();
+    prisma.organizationUser.findUnique.mockResolvedValue(disabled(ROLE_ROWS.ACCOUNTANT));
+    prisma.organizationUser.findFirst.mockResolvedValue({ roleId: "role-owner", role: ROLE_ROWS.COMPANY_OWNER });
+    prisma.organizationInvitation.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+    prisma.organizationUser.update.mockResolvedValue({ id: "m-1", status: "ACTIVE" });
+
+    await service.enableMember("org-1", "owner-1", false, "m-1");
+    expect(prisma.organizationUser.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "ACTIVE" } }));
+  });
+
+  test("only a COMPANY_OWNER can re-enable a disabled COMPANY_OWNER", async () => {
+    const { prisma, service } = makeMocks();
+    prisma.organizationUser.findUnique.mockResolvedValue(disabled(ROLE_ROWS.COMPANY_OWNER));
+    prisma.organizationUser.findFirst.mockResolvedValue({ roleId: "role-admin", role: ROLE_ROWS.COMPANY_ADMIN });
+
+    await expect(service.enableMember("org-1", "admin-1", false, "m-1")).rejects.toThrow(ForbiddenException);
+    expect(prisma.organizationUser.update).not.toHaveBeenCalled();
+  });
+
+  test("cannot re-enable a member whose role has permissions the actor lacks", async () => {
+    const { prisma, service } = makeMocks();
+    prisma.organizationUser.findUnique.mockResolvedValue(disabled(ROLE_ROWS.FINANCE_MANAGER));
+    prisma.organizationUser.findFirst.mockResolvedValue({ roleId: "role-accountant", role: ROLE_ROWS.ACCOUNTANT });
+
+    await expect(service.enableMember("org-1", "accountant-1", false, "m-1")).rejects.toThrow(ForbiddenException);
+  });
+});
+
+describe("OrganizationsService invitation email limits", () => {
+  test("resends count toward the organization's hourly limit", async () => {
+    const { prisma, service } = makeMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue({ id: "inv-1", organizationId: "org-1", email: "x@example.com", acceptedAt: null, revokedAt: null });
+    prisma.organizationInvitation.count.mockResolvedValue(5); // 5 new invites this hour
+    prisma.auditLog.count.mockImplementation(async ({ where }: any) => (where.objectId ? 0 : 15)); // + 15 resends = 20
+
+    await expect(service.resendInvitation("org-1", "owner-1", "inv-1")).rejects.toThrow(/too many invitations/);
+    expect(prisma.organizationInvitation.update).not.toHaveBeenCalled();
+  });
+
+  test("one invitation can be resent at most 3 times an hour", async () => {
+    const { prisma, service, email } = makeMocks();
+    prisma.organizationInvitation.findUnique.mockResolvedValue({ id: "inv-1", organizationId: "org-1", email: "x@example.com", acceptedAt: null, revokedAt: null });
+    prisma.auditLog.count.mockImplementation(async ({ where }: any) => (where.objectId === "inv-1" ? 3 : 3));
+
+    await expect(service.resendInvitation("org-1", "owner-1", "inv-1")).rejects.toThrow(/resent too many times/);
+    expect(email.send).not.toHaveBeenCalled();
+  });
+
+  test("a simultaneous duplicate invite is a 409, not a server error", async () => {
+    const { prisma, service } = makeMocks();
+    const { Prisma } = jest.requireActual("@prisma/client");
+    prisma.user.findFirst.mockResolvedValue(null);
+    prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" })
+    );
+
+    await expect(
+      service.inviteMember("org-1", "owner-1", true, { email: "dup@example.com", fullName: "Dup", roleName: ROLES.ACCOUNTANT })
+    ).rejects.toThrow(ConflictException);
   });
 });
 
