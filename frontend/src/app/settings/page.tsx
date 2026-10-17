@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
@@ -58,6 +59,16 @@ function SettingsPage() {
         <h2 className="text-sm font-semibold mb-1">Profile</h2>
         <p className="text-sm text-muted">{claims?.email}</p>
       </Card>
+
+      {claims?.organizationId && (
+        <Card className="mb-6">
+          <h2 className="text-sm font-semibold mb-1">Team members</h2>
+          <p className="text-xs text-muted mb-3">Invite people, change roles, and disable access for your organization.</p>
+          <Link href="/settings/team" className="text-primary hover:underline text-sm font-medium">
+            Manage team members →
+          </Link>
+        </Card>
+      )}
 
       {claims?.organizationId && <ConnectedApps />}
 

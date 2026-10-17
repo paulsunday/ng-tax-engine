@@ -11,10 +11,16 @@ import { SwitchOrganizationDto } from "./dto/switch-organization.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { RequestPasswordResetDto, ResetPasswordDto } from "./dto/password-reset.dto";
 import { SsoExchangeDto } from "./dto/sso-exchange.dto";
+import { InspectInvitationDto, AcceptInvitationDto } from "./dto/invitation.dto";
 
 // 5 attempts/minute per IP on every credential-bearing auth endpoint — brute-force and
 // credential-stuffing protection (brief §41). Tighter than the app-wide default limit.
 const AUTH_THROTTLE = { default: { limit: 5, ttl: seconds(60) } };
+// A little more headroom than the credential endpoints above: inspecting/accepting an
+// invitation isn't guessing a password against a known account, it's presenting a 32-byte
+// token whose entropy is the real defense — this limit is a courtesy backstop, not the
+// primary control, same reasoning as the password-reset endpoints.
+const INVITATION_THROTTLE = { default: { limit: 10, ttl: seconds(60) } };
 
 @Controller("auth")
 export class AuthController {
@@ -95,5 +101,19 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   exchangeSsoCode(@Body() dto: SsoExchangeDto) {
     return this.authService.exchangeSsoCode(dto.code, dto.totpCode);
+  }
+
+  @Post("invitations/inspect")
+  @HttpCode(200)
+  @Throttle(INVITATION_THROTTLE)
+  inspectInvitation(@Body() dto: InspectInvitationDto) {
+    return this.authService.inspectInvitation(dto.token);
+  }
+
+  @Post("invitations/accept")
+  @HttpCode(200)
+  @Throttle(INVITATION_THROTTLE)
+  acceptInvitation(@Body() dto: AcceptInvitationDto) {
+    return this.authService.acceptInvitation(dto.token, dto.fullName, dto.password);
   }
 }

@@ -13,6 +13,24 @@ import { hashSecret } from "../integrations/integrations.service";
 
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function hashInviteToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** Same generic message for every invalid-invitation reason (bad/expired/revoked/already-used token) — never tells an unauthenticated caller which one. */
+function INVALID_INVITATION_ERROR(): BadRequestException {
+  return new BadRequestException("This invitation link is invalid, expired, or has already been used.");
+}
+
+function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at <= 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"*".repeat(Math.max(local.length - visible.length, 1))}@${domain}`;
+}
 // Bump this string whenever the published Terms & Conditions change materially — it is
 // stored on the organization at acceptance time, so "which version did this company
 // actually agree to" stays answerable even after the text is later updated.
@@ -274,6 +292,99 @@ export class AuthService {
       data: { passwordHash, passwordResetTokenHash: null, passwordResetExpiresAt: null },
     });
     await this.auditLog.record({ organizationId: null, userId: user.id, action: "RESET_PASSWORD", objectType: "User", objectId: user.id });
+  }
+
+  /**
+   * Public, pre-authentication preview of an invitation — lets the accept-invite page show
+   * "you're joining Acme Ltd as Accountant, invited by Jane" before asking for a password.
+   * Every failure path (bad token, expired, revoked, already accepted) returns the exact
+   * same generic error — never reveals which reason, since a caller with no token shouldn't
+   * learn anything from the difference (mandate §4 IDOR principle, applied to invites).
+   */
+  async inspectInvitation(token: string): Promise<{
+    organizationName: string;
+    invitedByName: string;
+    roleName: string;
+    maskedEmail: string;
+    requiresPassword: boolean;
+  }> {
+    const invitation = await this.findLiveInvitationByToken(token);
+    return {
+      organizationName: invitation.organization.name,
+      invitedByName: invitation.invitedBy.fullName,
+      roleName: invitation.role.name,
+      maskedEmail: maskEmail(invitation.membership.user.email),
+      requiresPassword: !invitation.membership.user.passwordSet,
+    };
+  }
+
+  /**
+   * Accepting an invitation is the ONLY way an INVITED membership becomes ACTIVE. A
+   * brand-new invitee (passwordSet=false) must set a real password here — same minimum-
+   * length policy as registration; an existing account just confirms the invite, no
+   * password involved even if one was sent. Recorded with the INVITEE as actor, not the
+   * inviter — it's their own action.
+   */
+  async acceptInvitation(token: string, fullName: string | undefined, password: string | undefined): Promise<{ accessToken: string }> {
+    const tokenHash = hashInviteToken(token);
+
+    const { organizationId, userId, roleId, roleName, isPlatformAdmin, isTaxRuleApprover, email } = await this.prisma.$transaction(async (tx) => {
+      const invitation = await tx.organizationInvitation.findUnique({
+        where: { tokenHash },
+        include: { membership: { include: { user: true, role: true } } },
+      });
+      if (!invitation || invitation.acceptedAt || invitation.revokedAt || invitation.expiresAt < new Date()) {
+        throw INVALID_INVITATION_ERROR();
+      }
+
+      const { user, role } = invitation.membership;
+      if (!user.isActive || user.erasedAt) throw INVALID_INVITATION_ERROR();
+
+      if (!user.passwordSet) {
+        if (!password) throw new BadRequestException("A password is required to accept this invitation.");
+        const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        await tx.user.update({
+          where: { id: user.id },
+          data: { passwordHash, passwordSet: true, fullName: fullName?.trim() || user.fullName },
+        });
+      }
+
+      await tx.organizationInvitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } });
+      await tx.organizationUser.update({ where: { id: invitation.membershipId }, data: { status: "ACTIVE", joinedAt: new Date() } });
+
+      return {
+        organizationId: invitation.organizationId,
+        userId: user.id,
+        roleId: role.id,
+        roleName: role.name,
+        isPlatformAdmin: user.isPlatformAdmin,
+        isTaxRuleApprover: user.isTaxRuleApprover,
+        email: user.email,
+      };
+    });
+
+    await this.auditLog.record({
+      organizationId,
+      userId,
+      action: "ACCEPT_INVITATION",
+      objectType: "OrganizationUser",
+      objectId: userId,
+      newValue: { status: "ACTIVE" },
+    });
+
+    return { accessToken: this.signToken(userId, email, organizationId, roleId, roleName, isPlatformAdmin, isTaxRuleApprover) };
+  }
+
+  private async findLiveInvitationByToken(token: string) {
+    const tokenHash = hashInviteToken(token);
+    const invitation = await this.prisma.organizationInvitation.findUnique({
+      where: { tokenHash },
+      include: { organization: true, role: true, invitedBy: true, membership: { include: { user: true } } },
+    });
+    if (!invitation || invitation.acceptedAt || invitation.revokedAt || invitation.expiresAt < new Date()) {
+      throw INVALID_INVITATION_ERROR();
+    }
+    return invitation;
   }
 
   /**

@@ -48,7 +48,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         where: { organizationId_userId: { organizationId: payload.organizationId, userId: user.id } },
         include: { role: { select: { name: true } } },
       });
-      if (!membership || membership.status === "DISABLED") {
+      // Only ACTIVE counts — INVITED (invitation not yet accepted) and DISABLED must both
+      // be refused here, not just DISABLED (security finding 2026-10-17: an INVITED
+      // membership must never grant a working session before the invite is accepted).
+      if (!membership || membership.status !== "ACTIVE") {
         throw new UnauthorizedException("No longer an active member of this organization.");
       }
       roleId = membership.roleId;

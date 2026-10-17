@@ -12,13 +12,14 @@ function makeMocks() {
     auditLog: { findMany: jest.fn() },
   };
   const auditLog: any = { record: jest.fn() };
-  const service = new UsersService(prisma, auditLog);
-  return { prisma, auditLog, service };
+  const organizations: any = { revokeInvitationsSentBy: jest.fn().mockResolvedValue(0), listInvitationsForExport: jest.fn().mockResolvedValue({ sent: [], received: [] }) };
+  const service = new UsersService(prisma, auditLog, organizations);
+  return { prisma, auditLog, organizations, service };
 }
 
 describe("UsersService.requestErasure (NDPA/NDPR right to erasure)", () => {
   test("anonymizes personal fields and deactivates the account, never hard-deletes the row", async () => {
-    const { service, prisma, auditLog } = makeMocks();
+    const { service, prisma, auditLog, organizations } = makeMocks();
     prisma.user.findUniqueOrThrow.mockResolvedValue({ id: "user-1", erasedAt: null, email: "real@person.com", fullName: "Real Person" });
     prisma.user.update.mockResolvedValue({});
 
@@ -33,6 +34,7 @@ describe("UsersService.requestErasure (NDPA/NDPR right to erasure)", () => {
     expect(updateArgs.data.mfaSecret).toBeNull();
     expect(updateArgs.data.erasedAt).toBeInstanceOf(Date);
     expect(auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: "ERASURE_REQUESTED", objectId: "user-1" }));
+    expect(organizations.revokeInvitationsSentBy).toHaveBeenCalledWith("user-1");
   });
 
   test("is idempotent — a second request on an already-erased account does not re-update or re-log", async () => {
@@ -112,6 +114,8 @@ describe("UsersService.exportMyData (NDPA/NDPR right of access)", () => {
       { organizationId: "org-1", organizationName: "Org One", roleName: "COMPANY_OWNER", status: "ACTIVE", joinedAt: new Date("2026-01-01") },
     ]);
     expect(result.auditLogHistory).toHaveLength(1);
+    expect(result.invitationsSent).toEqual([]);
+    expect(result.invitationsReceived).toEqual([]);
     expect(prisma.organizationUser.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "user-1" } }));
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "user-1" } }));
   });

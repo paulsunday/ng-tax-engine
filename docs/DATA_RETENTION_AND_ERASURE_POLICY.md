@@ -30,7 +30,17 @@ SaaS platforms take for this exact conflict.
 | `User.erasedAt` | Set to the erasure timestamp — proof of *when* the right was exercised |
 | `AuditLog` rows referencing this user | **Untouched.** They only ever stored a `userId` foreign key, never the person's name/email directly — the audit trail survives, but no longer resolves to identifying information once the `User` row itself is anonymized |
 | `OrganizationUser` membership rows | **Untouched** — membership history (which org, which role, when) is organizational record-keeping, not personal data about the individual beyond the already-anonymized user reference |
+| `OrganizationInvitation` rows the user **sent** (as an inviter) | Revoked (`revokedAt` set) if still pending — `OrganizationsService.revokeInvitationsSentBy`, called from `requestErasure`. A pending invite tied to an erased inviter shouldn't stay silently acceptable. |
+| `OrganizationInvitation` rows **addressed to** the user (as an invitee) | **Untouched by erasure** — same reasoning as membership rows: the `email`/`roleId`/dates on an invitation row are organizational record-keeping (who was invited, when, by whom), not personal data requiring scrubbing once the `User` row itself is anonymized. A pending invite to an erased email will simply fail at accept-time (`acceptInvitation` already refuses `erasedAt`-set accounts). |
 | Any `Employee`/`Customer`/`Supplier` records | **Out of scope entirely.** Those aren't `User` accounts — they're business records a company (the data controller) maintains about third parties. A request to erase an employee's or customer's data must go to the organization that entered that data, not this endpoint. |
+
+Retention of `OrganizationInvitation` rows themselves: expired/revoked/accepted rows are
+kept indefinitely alongside the membership they belong to, on the same reasoning as
+`AuditLog` and membership history above — they're a record of an organizational decision
+(who was invited, by whom, when, and what happened), not a standalone personal-data store
+that needs its own TTL. `NDPA export` (`UsersService.exportMyData` via
+`OrganizationsService.listInvitationsForExport`) surfaces a user's own sent/received
+invitations so the right of access covers them too.
 
 ## What this policy does NOT yet cover
 

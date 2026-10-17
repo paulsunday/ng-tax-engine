@@ -1,12 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditLogService } from "../audit-log/audit-log.service";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditLog: AuditLogService
+    private readonly auditLog: AuditLogService,
+    private readonly organizations: OrganizationsService
   ) {}
 
   async getProfile(userId: string) {
@@ -42,6 +44,10 @@ export class UsersService {
       orderBy: { createdAt: "desc" },
       select: { id: true, organizationId: true, action: true, objectType: true, objectId: true, createdAt: true },
     });
+    // Invitations are personal data about this user too — both ones they sent (as an
+    // inviter) and ones addressed to them (as an invitee) — never another organization's
+    // unrelated invitations.
+    const invitations = await this.organizations.listInvitationsForExport(userId);
 
     return {
       exportedAt: new Date().toISOString(),
@@ -54,6 +60,8 @@ export class UsersService {
         joinedAt: m.joinedAt,
       })),
       auditLogHistory: auditLogEntries,
+      invitationsSent: invitations.sent,
+      invitationsReceived: invitations.received,
     };
   }
 
@@ -86,6 +94,7 @@ export class UsersService {
         erasedAt,
       },
     });
+    await this.organizations.revokeInvitationsSentBy(userId);
 
     await this.auditLog.record({
       organizationId: null,

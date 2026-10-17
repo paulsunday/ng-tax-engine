@@ -32,6 +32,7 @@ export function Nav() {
             Netwave Books
           </Link>
           {claims?.organizationId && <NavLink href="/">Companies</NavLink>}
+          {claims?.organizationId && <NavLink href="/settings/team">Team</NavLink>}
           {(claims?.isPlatformAdmin || claims?.isTaxRuleApprover) && <NavLink href="/admin/tax-rules">Tax Rules</NavLink>}
         </div>
         <div className="flex items-center gap-5 text-sm">

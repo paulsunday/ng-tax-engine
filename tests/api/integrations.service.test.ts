@@ -91,6 +91,19 @@ describe("IntegrationsService.summary", () => {
     expect(summary.latestReturns.VAT!.taxLiabilityNgn).toBeNull();
     expect(summary.latestReturns.CIT).toBeNull();
   });
+
+  test("response shape contract: top-level keys are unchanged by the invitations feature — tenant-billing depends on this exact shape", async () => {
+    const { prisma, companies, auditLog } = makeMocks();
+    prisma.company.findUniqueOrThrow.mockResolvedValue({ id: "company-1", name: "Netwave Tech Labs", vatRegistered: true });
+    const service = new IntegrationsService(prisma, companies, auditLog);
+
+    const summary = await service.summary(connection);
+
+    expect(Object.keys(summary).sort()).toEqual(
+      ["company", "overdueCount", "upcomingDeadlines", "latestReturns", "unreadNotifications", "appUrl", "generatedAt"].sort()
+    );
+    expect(Object.keys(summary.company).sort()).toEqual(["id", "name", "vatRegistered"].sort());
+  });
 });
 
 describe("IntegrationsService.createSsoLink", () => {
@@ -102,6 +115,20 @@ describe("IntegrationsService.createSsoLink", () => {
 
     await expect(service.createSsoLink(connection, "outsider@example.com")).rejects.toThrow(NotFoundException);
     expect(prisma.integrationSsoCode.create).not.toHaveBeenCalled();
+  });
+
+  test("the live DB query itself is scoped to status: ACTIVE — an INVITED or DISABLED membership is never a match, same failure as no membership at all", async () => {
+    const { prisma, companies, auditLog } = makeMocks();
+    prisma.user.findFirst.mockResolvedValue({ id: "user-2", isActive: true, erasedAt: null });
+    // This mock simulates what the real `where: { status: "ACTIVE" }` filter in
+    // createSsoLink would return for an INVITED/DISABLED membership: nothing.
+    prisma.organizationUser.findFirst.mockResolvedValue(null);
+    const service = new IntegrationsService(prisma, companies, auditLog);
+
+    await expect(service.createSsoLink(connection, "invited-or-disabled@example.com")).rejects.toThrow(NotFoundException);
+    expect(prisma.organizationUser.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: "ACTIVE" }) })
+    );
   });
 
   test("puts the code in the URL fragment and stores only its hash", async () => {
