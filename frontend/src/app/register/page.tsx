@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Button, Input } from "@/components/ui";
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -44,37 +45,32 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-sm mx-auto mt-16 px-4">
-      <h1 className="text-lg font-semibold mb-6">Create your workspace</h1>
+      <h1 className="text-xl font-semibold tracking-tight mb-6">Create your workspace</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
-        <input type="text" placeholder="Organization name" value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="border rounded px-3 py-2 text-sm" />
+        <Input type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        <Input type="text" placeholder="Organization name" value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required />
+        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
 
-        <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 mt-1">
-          <input
-            type="checkbox"
-            checked={acceptedTerms}
-            onChange={(e) => setAcceptedTerms(e.target.checked)}
-            className="mt-0.5"
-          />
+        <label className="flex items-start gap-2 text-sm text-muted mt-1">
+          <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-0.5 accent-primary" />
           <span>
             I have read and accept the{" "}
-            <Link href="/terms" target="_blank" className="text-blue-600 hover:underline">
+            <Link href="/terms" target="_blank" className="text-primary hover:underline">
               Terms &amp; Conditions
             </Link>{" "}
             on behalf of the company being registered.
           </span>
         </label>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button type="submit" disabled={isSubmitting || !acceptedTerms} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+        {error && <p className="text-danger text-sm">{error}</p>}
+        <Button type="submit" disabled={isSubmitting || !acceptedTerms}>
           {isSubmitting ? "Creating…" : "Create workspace"}
-        </button>
+        </Button>
       </form>
-      <p className="text-sm text-gray-500 mt-4">
+      <p className="text-sm text-muted mt-4">
         Already have an account?{" "}
-        <Link href="/login" className="text-blue-600 hover:underline">
+        <Link href="/login" className="text-primary hover:underline font-medium">
           Log in
         </Link>
       </p>

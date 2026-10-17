@@ -8,8 +8,8 @@ import Link from "next/link";
  */
 export function DisclaimerBanner() {
   return (
-    <div className="border-b border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 px-6 py-3 text-xs text-yellow-900 dark:text-yellow-200">
-      <strong>Built for accountants, auditors &amp; tax professionals:</strong> this platform
+    <div className="border-b border-warning-border bg-warning-surface px-6 py-2.5 text-xs text-warning-foreground">
+      <strong className="font-semibold">Built for accountants, auditors &amp; tax professionals:</strong> this platform
       makes accounting, audit support, and tax-compliance filing faster and less error-prone
       for the qualified professional operating it — it is a tool for that professional to
       use, not a replacement for one, and it does not itself provide accounting, audit, or

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
 import { CompanySubNav } from "@/components/CompanySubNav";
+import { Badge, Button, EmptyState, Input, PageHeader, Select, Table, Thead, Th, Td, Tr } from "@/components/ui";
 
 interface Company {
   id: string;
@@ -55,14 +56,14 @@ function CompanyDetail() {
 
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4 pb-16">
-      <Link href="/" className="text-sm text-blue-600 hover:underline">
+      <Link href="/" className="text-sm text-primary hover:underline">
         ← All companies
       </Link>
-      {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
+      {error && <p className="text-danger text-sm mt-3">{error}</p>}
       {company && (
         <div className="mt-3 mb-8">
-          <h1 className="text-xl font-semibold">{company.name}</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-semibold tracking-tight">{company.name}</h1>
+          <p className="text-sm text-muted">
             HQ: {company.headOfficeStateCode} {company.tin ? `· TIN: ${company.tin}` : "· No TIN on file"}
           </p>
         </div>
@@ -74,67 +75,65 @@ function CompanyDetail() {
 
       <section className="mt-10">
         <h2 className="text-sm font-semibold mb-3">Compliance calendar</h2>
-        {calendar?.length === 0 && <p className="text-sm text-gray-500">No compliance calendar entries yet.</p>}
+        {calendar?.length === 0 && <EmptyState>No compliance calendar entries yet.</EmptyState>}
         {calendar && calendar.length > 0 && (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="py-2">Tax type</th>
-                <th>Period</th>
-                <th>Statutory deadline</th>
-                <th>Days remaining</th>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Tax type</Th>
+                <Th>Period</Th>
+                <Th>Statutory deadline</Th>
+                <Th>Days remaining</Th>
               </tr>
-            </thead>
+            </Thead>
             <tbody>
               {calendar.map((e) => (
-                <tr key={e.id} className="border-b">
-                  <td className="py-2">{e.taxType}</td>
-                  <td>{e.periodLabel}</td>
-                  <td>{new Date(e.statutoryDeadline).toLocaleDateString()}</td>
-                  <td className={e.isOverdue ? "text-red-600 font-medium" : ""}>
-                    {e.isOverdue ? "OVERDUE" : `${e.daysRemaining} days`}
-                  </td>
-                </tr>
+                <Tr key={e.id}>
+                  <Td>{e.taxType}</Td>
+                  <Td>{e.periodLabel}</Td>
+                  <Td>{new Date(e.statutoryDeadline).toLocaleDateString()}</Td>
+                  <Td className={e.isOverdue ? "text-danger font-medium" : ""}>{e.isOverdue ? "OVERDUE" : `${e.daysRemaining} days`}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </section>
 
       <section className="mt-10">
         <h2 className="text-sm font-semibold mb-3">Tax returns</h2>
-        {taxReturns?.length === 0 && <p className="text-sm text-gray-500">No tax returns yet — run a calculation above.</p>}
+        {taxReturns?.length === 0 && <EmptyState>No tax returns yet — run a calculation above.</EmptyState>}
         {taxReturns && taxReturns.length > 0 && (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="py-2">Tax type</th>
-                <th>Period</th>
-                <th>Status</th>
-                <th>Compliance state</th>
-                <th>Liability (₦)</th>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Tax type</Th>
+                <Th>Period</Th>
+                <Th>Status</Th>
+                <Th>Compliance state</Th>
+                <Th>Liability (₦)</Th>
               </tr>
-            </thead>
+            </Thead>
             <tbody>
               {taxReturns.map((r) => (
-                <tr key={r.id} className="border-b">
-                  <td className="py-2">
-                    <Link href={`/companies/${companyId}/tax-returns/${r.id}`} className="text-blue-600 hover:underline">
+                <Tr key={r.id}>
+                  <Td>
+                    <Link href={`/companies/${companyId}/tax-returns/${r.id}`} className="text-primary hover:underline font-medium">
                       {r.taxType}
                     </Link>
-                  </td>
-                  <td>
+                  </Td>
+                  <Td>
                     {new Date(r.periodStart).toLocaleDateString()} – {new Date(r.periodEnd).toLocaleDateString()}
-                  </td>
-                  <td>{r.status}</td>
-                  <td>
+                  </Td>
+                  <Td>{r.status}</Td>
+                  <Td>
                     <ComplianceStateBadge state={r.complianceState} />
-                  </td>
-                  <td>{r.taxLiabilityNgn !== null ? Number(r.taxLiabilityNgn).toLocaleString() : "—"}</td>
-                </tr>
+                  </Td>
+                  <Td>{r.taxLiabilityNgn !== null ? Number(r.taxLiabilityNgn).toLocaleString() : "—"}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </section>
 
@@ -167,32 +166,26 @@ function ExportBusinessRecords({ companyId }: { companyId: string }) {
   }
 
   return (
-    <section className="mt-10 border rounded p-4">
+    <section className="mt-10 bg-surface border border-border rounded-xl p-5">
       <h2 className="text-sm font-semibold mb-2">Export business records</h2>
-      <p className="text-xs text-gray-500 mb-3">
+      <p className="text-xs text-muted mb-3">
         Downloads this company&apos;s full business records as JSON — customers, suppliers, invoices, expenses,
         chart of accounts, journal entries, assets, bank accounts, employees, tax returns, compliance calendar, and
         document metadata. This is the organization&apos;s own business data, distinct from an individual user&apos;s
         personal NDPA export under Settings.
       </p>
-      <button onClick={exportAndDownload} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+      <Button variant="secondary" onClick={exportAndDownload} disabled={busy}>
         {busy ? "Exporting…" : "Export business records"}
-      </button>
-      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+      </Button>
+      {error && <p className="text-danger text-sm mt-2">{error}</p>}
     </section>
   );
 }
 
+/** PENDING_RULE_APPROVAL/withheld states must never read as success (brief: never fabricate a result). */
 export function ComplianceStateBadge({ state }: { state: string }) {
-  const color =
-    state === "CALCULATED"
-      ? "bg-green-100 text-green-800"
-      : state === "PENDING_RULE_APPROVAL"
-        ? "bg-yellow-100 text-yellow-800"
-        : state === "CALCULATION_ERROR"
-          ? "bg-red-100 text-red-800"
-          : "bg-gray-100 text-gray-700";
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>{state.replaceAll("_", " ")}</span>;
+  const tone = state === "CALCULATED" ? "success" : state === "PENDING_RULE_APPROVAL" ? "warning" : state === "CALCULATION_ERROR" ? "danger" : "neutral";
+  return <Badge tone={tone}>{state.replaceAll("_", " ")}</Badge>;
 }
 
 function RunCalculationForm({ companyId, onComputed }: { companyId: string; onComputed: () => void }) {
@@ -221,30 +214,30 @@ function RunCalculationForm({ companyId, onComputed }: { companyId: string; onCo
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border rounded p-4 flex flex-wrap items-end gap-3">
+    <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-xl p-5 flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500">Tax type</label>
-        <select value={taxType} onChange={(e) => setTaxType(e.target.value as (typeof TAX_TYPES)[number])} className="border rounded px-3 py-2 text-sm">
+        <label className="text-xs text-muted">Tax type</label>
+        <Select value={taxType} onChange={(e) => setTaxType(e.target.value as (typeof TAX_TYPES)[number])}>
           {TAX_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500">Period start</label>
-        <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
+        <label className="text-xs text-muted">Period start</label>
+        <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} required />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500">Period end</label>
-        <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
+        <label className="text-xs text-muted">Period end</label>
+        <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} required />
       </div>
-      <button type="submit" disabled={isSubmitting} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+      <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Calculating…" : "Run calculation"}
-      </button>
-      {error && <p className="text-red-600 text-sm w-full">{error}</p>}
-      {notice && <p className="text-gray-600 text-sm w-full">{notice}</p>}
+      </Button>
+      {error && <p className="text-danger text-sm w-full">{error}</p>}
+      {notice && <p className="text-muted text-sm w-full">{notice}</p>}
     </form>
   );
 }

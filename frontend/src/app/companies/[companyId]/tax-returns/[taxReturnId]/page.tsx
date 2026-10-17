@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
+import { Button, Card } from "@/components/ui";
 import { ComplianceStateBadge } from "../../page";
 
 interface TaxReturnDetail {
@@ -80,24 +81,24 @@ function TaxReturnDetailView() {
   if (!taxReturn) {
     return (
       <div className="max-w-2xl mx-auto mt-10 px-4">
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        {!error && <p className="text-sm text-gray-500">Loading…</p>}
+        {error && <p className="text-danger text-sm">{error}</p>}
+        {!error && <p className="text-sm text-muted">Loading…</p>}
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto mt-10 px-4 pb-16">
-      <Link href={`/companies/${companyId}`} className="text-sm text-blue-600 hover:underline">
+      <Link href={`/companies/${companyId}`} className="text-sm text-primary hover:underline">
         ← Back to company
       </Link>
 
       <div className="mt-3 mb-6">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-xl font-semibold tracking-tight">
           {taxReturn.taxType} — {new Date(taxReturn.periodStart).toLocaleDateString()} to {new Date(taxReturn.periodEnd).toLocaleDateString()}
         </h1>
         <div className="flex items-center gap-2 mt-2 text-sm">
-          <span className="text-gray-500">Status: {taxReturn.status}</span>
+          <span className="text-muted">Status: {taxReturn.status}</span>
           <ComplianceStateBadge state={taxReturn.complianceState} />
         </div>
         <p className="text-sm mt-2">
@@ -106,45 +107,45 @@ function TaxReturnDetailView() {
             ? `₦${Number(taxReturn.taxLiabilityNgn).toLocaleString()}`
             : "Not available — see compliance state above for why."}
         </p>
-        {taxReturn.rejectionReason && <p className="text-sm text-red-600 mt-1">Rejected: {taxReturn.rejectionReason}</p>}
+        {taxReturn.rejectionReason && <p className="text-sm text-danger mt-1">Rejected: {taxReturn.rejectionReason}</p>}
       </div>
 
       {capability && (
-        <div className="border rounded p-4 mb-6 text-sm">
+        <Card className="mb-6 text-sm">
           <p className="font-medium mb-1">Filing authority: {capability.authorityName}</p>
-          <p className="text-gray-600">
+          <p className="text-muted">
             Filing capability: {capability.filingCapability.replaceAll("_", " ")} · Payment capability: {capability.paymentCapability.replaceAll("_", " ")}
           </p>
           {!capability.supportsAutomaticSubmission && (
-            <p className="text-gray-500 mt-1">No confirmed official e-filing API exists for this authority — submission produces a manual filing package.</p>
+            <p className="text-muted mt-1">No confirmed official e-filing API exists for this authority — submission produces a manual filing package.</p>
           )}
-        </div>
+        </Card>
       )}
 
       <div className="flex gap-2">
         {taxReturn.status === "DRAFT" && (
-          <button onClick={() => act("validate")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <Button onClick={() => act("validate")} disabled={busy}>
             Validate
-          </button>
+          </Button>
         )}
         {taxReturn.status === "VALIDATED" && (
-          <button onClick={() => act("approve")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <Button onClick={() => act("approve")} disabled={busy}>
             Approve
-          </button>
+          </Button>
         )}
         {taxReturn.status === "APPROVED" && (
-          <button onClick={() => act("submit")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <Button onClick={() => act("submit")} disabled={busy}>
             Submit filing
-          </button>
+          </Button>
         )}
       </div>
 
-      {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
-      {notice && <p className="text-gray-700 text-sm mt-3">{notice}</p>}
+      {error && <p className="text-danger text-sm mt-3">{error}</p>}
+      {notice && <p className="text-muted text-sm mt-3">{notice}</p>}
 
       <details className="mt-8">
-        <summary className="text-sm text-gray-500 cursor-pointer">Full calculation breakdown (raw)</summary>
-        <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded mt-2 overflow-x-auto">{JSON.stringify(taxReturn.calculationBreakdown, null, 2)}</pre>
+        <summary className="text-sm text-muted cursor-pointer">Full calculation breakdown (raw)</summary>
+        <pre className="text-xs bg-surface-muted p-3 rounded-lg mt-2 overflow-x-auto">{JSON.stringify(taxReturn.calculationBreakdown, null, 2)}</pre>
       </details>
     </div>
   );

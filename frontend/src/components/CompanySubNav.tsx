@@ -11,12 +11,16 @@ const TABS = [
 
 export function CompanySubNav({ companyId, active }: { companyId: string; active: string }) {
   return (
-    <nav className="flex gap-4 border-b mb-6 text-sm overflow-x-auto">
+    <nav className="flex gap-1 mb-6 text-sm overflow-x-auto border-b border-border">
       {TABS.map((tab) => (
         <Link
           key={tab.label}
           href={`/companies/${companyId}${tab.href}`}
-          className={`pb-2 whitespace-nowrap ${active === tab.label ? "border-b-2 border-black dark:border-white font-medium" : "text-gray-500 hover:text-black dark:hover:text-white"}`}
+          className={`px-3 py-2 whitespace-nowrap border-b-2 -mb-px transition-colors ${
+            active === tab.label
+              ? "border-primary text-primary font-medium"
+              : "border-transparent text-muted hover:text-foreground hover:border-border"
+          }`}
         >
           {tab.label}
         </Link>

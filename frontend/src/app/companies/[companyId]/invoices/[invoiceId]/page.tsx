@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
+import { Button, Card, Input, StatusBadge } from "@/components/ui";
 
 interface InvoiceDetail {
   id: string;
@@ -66,51 +67,68 @@ function InvoiceDetailView() {
   }
 
   if (!invoice) {
-    return <div className="max-w-xl mx-auto mt-10 px-4">{error ? <p className="text-red-600 text-sm">{error}</p> : <p className="text-sm text-gray-500">Loading…</p>}</div>;
+    return <div className="max-w-xl mx-auto mt-10 px-4">{error ? <p className="text-danger text-sm">{error}</p> : <p className="text-sm text-muted">Loading…</p>}</div>;
   }
 
   const outstanding = Number(invoice.totalNgn) - Number(invoice.amountPaidNgn);
 
   return (
     <div className="max-w-xl mx-auto mt-10 px-4 pb-16">
-      <Link href={`/companies/${companyId}/invoices`} className="text-sm text-blue-600 hover:underline">
+      <Link href={`/companies/${companyId}/invoices`} className="text-sm text-primary hover:underline">
         ← Invoices
       </Link>
-      <h1 className="text-xl font-semibold mt-3 mb-1">{invoice.invoiceNumber}</h1>
-      <p className="text-sm text-gray-500 mb-4">Status: {invoice.status}</p>
-
-      <div className="text-sm border rounded p-4 mb-6 flex flex-col gap-1">
-        <div className="flex justify-between"><span>Subtotal</span><span>₦{Number(invoice.subtotalNgn).toLocaleString()}</span></div>
-        <div className="flex justify-between"><span>VAT</span><span>₦{Number(invoice.vatAmountNgn).toLocaleString()}</span></div>
-        <div className="flex justify-between font-medium"><span>Total</span><span>₦{Number(invoice.totalNgn).toLocaleString()}</span></div>
-        <div className="flex justify-between"><span>Paid</span><span>₦{Number(invoice.amountPaidNgn).toLocaleString()}</span></div>
-        <div className="flex justify-between font-medium"><span>Outstanding</span><span>₦{outstanding.toLocaleString()}</span></div>
+      <h1 className="text-xl font-semibold tracking-tight mt-3 mb-1">{invoice.invoiceNumber}</h1>
+      <div className="mb-4">
+        <StatusBadge status={invoice.status} />
       </div>
 
+      <Card className="text-sm mb-6 flex flex-col gap-1.5">
+        <div className="flex justify-between">
+          <span className="text-muted">Subtotal</span>
+          <span>₦{Number(invoice.subtotalNgn).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted">VAT</span>
+          <span>₦{Number(invoice.vatAmountNgn).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between font-medium border-t border-border pt-1.5 mt-1">
+          <span>Total</span>
+          <span>₦{Number(invoice.totalNgn).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted">Paid</span>
+          <span>₦{Number(invoice.amountPaidNgn).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between font-medium">
+          <span>Outstanding</span>
+          <span>₦{outstanding.toLocaleString()}</span>
+        </div>
+      </Card>
+
       {invoice.status === "DRAFT" && (
-        <button onClick={post} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+        <Button onClick={post} disabled={busy}>
           Post to ledger
-        </button>
+        </Button>
       )}
 
       {["SENT", "PARTIALLY_PAID", "OVERDUE"].includes(invoice.status) && outstanding > 0 && (
-        <form onSubmit={recordPayment} className="border rounded p-4 flex flex-wrap items-end gap-3 mt-4">
+        <form onSubmit={recordPayment} className="bg-surface border border-border rounded-xl p-5 flex flex-wrap items-end gap-3 mt-4">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Amount (₦)</label>
-            <input type="number" step="0.01" min="0.01" max={outstanding} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
+            <label className="text-xs text-muted">Amount (₦)</label>
+            <Input type="number" step="0.01" min="0.01" max={outstanding} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Payment date</label>
-            <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required className="border rounded px-3 py-2 text-sm" />
+            <label className="text-xs text-muted">Payment date</label>
+            <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required />
           </div>
-          <button type="submit" disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <Button type="submit" disabled={busy}>
             Record payment
-          </button>
+          </Button>
         </form>
       )}
 
-      {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
-      {notice && <p className="text-gray-700 text-sm mt-3">{notice}</p>}
+      {error && <p className="text-danger text-sm mt-3">{error}</p>}
+      {notice && <p className="text-muted text-sm mt-3">{notice}</p>}
     </div>
   );
 }

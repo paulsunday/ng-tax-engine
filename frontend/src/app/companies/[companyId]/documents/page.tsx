@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { api, apiUpload, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
 import { CompanySubNav } from "@/components/CompanySubNav";
+import { Badge, Button, EmptyState, PageHeader, Select } from "@/components/ui";
 
 const CATEGORIES = ["INVOICE", "RECEIPT", "CONTRACT", "BANK_STATEMENT", "PAYROLL", "ASSET_PURCHASE", "TAX", "PAYMENT_EVIDENCE", "SUPPLIER", "CUSTOMER", "OTHER"];
 
@@ -75,47 +76,51 @@ function DocumentsPage() {
   return (
     <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
       <CompanySubNav companyId={companyId} active="Documents" />
-      <h1 className="text-lg font-semibold mb-4">Documents</h1>
+      <PageHeader title="Documents" />
 
-      <form onSubmit={handleUpload} className="border rounded p-4 mb-6 flex flex-wrap items-end gap-3">
+      <form onSubmit={handleUpload} className="bg-surface border border-border rounded-xl p-5 mb-6 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">File</label>
+          <label className="text-xs text-muted">File</label>
           <input ref={fileInputRef} type="file" className="text-sm" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">Category</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="border rounded px-3 py-2 text-sm">
+          <label className="text-xs text-muted">Category</label>
+          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c.replaceAll("_", " ")}</option>
+              <option key={c} value={c}>
+                {c.replaceAll("_", " ")}
+              </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" disabled={uploading} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+        <Button type="submit" disabled={uploading}>
           {uploading ? "Uploading…" : "Upload"}
-        </button>
+        </Button>
       </form>
 
-      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
-      {notice && <p className="text-gray-700 text-sm mb-3">{notice}</p>}
+      {error && <p className="text-danger text-sm mb-3">{error}</p>}
+      {notice && <p className="text-muted text-sm mb-3">{notice}</p>}
 
-      {documents?.length === 0 && <p className="text-sm text-gray-500">No documents yet.</p>}
+      {documents?.length === 0 && <EmptyState>No documents yet.</EmptyState>}
       <ul className="flex flex-col gap-2 text-sm">
         {documents?.map((doc) => (
-          <li key={doc.id} className="border rounded px-4 py-3">
-            <div className="flex justify-between items-center">
+          <li key={doc.id} className="bg-surface border border-border rounded-xl px-4 py-3">
+            <div className="flex justify-between items-center gap-3">
               <div>
                 <span className="font-medium">{doc.fileName}</span>{" "}
-                <span className="text-gray-500">· {doc.category.replaceAll("_", " ")} · {(doc.sizeBytes / 1024).toFixed(0)} KB</span>
+                <span className="text-muted">
+                  · {doc.category.replaceAll("_", " ")} · {(doc.sizeBytes / 1024).toFixed(0)} KB
+                </span>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800">{doc.ocrStatus}</span>
+              <Badge>{doc.ocrStatus}</Badge>
             </div>
             {doc.ocrStatus === "PENDING" && (
-              <button onClick={() => runExtraction(doc.id)} disabled={busyId === doc.id} className="text-blue-600 hover:underline text-xs mt-2 disabled:opacity-50">
+              <button onClick={() => runExtraction(doc.id)} disabled={busyId === doc.id} className="text-primary hover:underline text-xs mt-2 disabled:opacity-50">
                 {busyId === doc.id ? "Extracting…" : "Run OCR extraction"}
               </button>
             )}
             {doc.ocrStatus === "COMPLETED" && doc.ocrExtractedData?.fields && (
-              <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded mt-2 overflow-x-auto">{JSON.stringify(doc.ocrExtractedData.fields, null, 2)}</pre>
+              <pre className="text-xs bg-surface-muted p-2 rounded-lg mt-2 overflow-x-auto">{JSON.stringify(doc.ocrExtractedData.fields, null, 2)}</pre>
             )}
           </li>
         ))}

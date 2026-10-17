@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { Button, Input } from "@/components/ui";
 
 interface LoginResponse {
   accessToken: string;
@@ -53,51 +54,25 @@ export default function LoginPage() {
 
   return (
     <>
-    <DisclaimerBanner />
-    <div className="max-w-sm mx-auto mt-16 px-4">
-      <h1 className="text-lg font-semibold mb-6">Log in</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="border rounded px-3 py-2 text-sm"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="border rounded px-3 py-2 text-sm"
-        />
-        {needsMfa && (
-          <input
-            type="text"
-            placeholder="6-digit MFA code"
-            value={totpCode}
-            onChange={(e) => setTotpCode(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
-          />
-        )}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50"
-        >
-          {isSubmitting ? "Logging in…" : "Log in"}
-        </button>
-      </form>
-      <p className="text-sm text-gray-500 mt-4">
-        No account?{" "}
-        <Link href="/register" className="text-blue-600 hover:underline">
-          Register
-        </Link>
-      </p>
-    </div>
+      <DisclaimerBanner />
+      <div className="max-w-sm mx-auto mt-16 px-4">
+        <h1 className="text-xl font-semibold tracking-tight mb-6">Log in</h1>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {needsMfa && <Input type="text" placeholder="6-digit MFA code" value={totpCode} onChange={(e) => setTotpCode(e.target.value)} />}
+          {error && <p className="text-danger text-sm">{error}</p>}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Logging in…" : "Log in"}
+          </Button>
+        </form>
+        <p className="text-sm text-muted mt-4">
+          No account?{" "}
+          <Link href="/register" className="text-primary hover:underline font-medium">
+            Register
+          </Link>
+        </p>
+      </div>
     </>
   );
 }

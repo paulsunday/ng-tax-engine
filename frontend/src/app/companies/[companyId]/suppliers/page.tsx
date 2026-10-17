@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
+import { Button, EmptyState, Input, PageHeader } from "@/components/ui";
 
 export interface Supplier {
   id: string;
@@ -39,18 +40,20 @@ function SuppliersPage() {
 
   return (
     <div className="max-w-2xl mx-auto mt-10 px-4 pb-16">
-      <h1 className="text-lg font-semibold mb-4">Suppliers</h1>
+      <PageHeader title="Suppliers" />
       <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
-        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required className="border rounded px-3 py-2 text-sm flex-1" />
-        <input placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} className="border rounded px-3 py-2 text-sm flex-1" />
-        <button type="submit" className="bg-black text-white rounded px-3 py-2 text-sm">Add</button>
+        <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required className="flex-1" />
+        <Input placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1" />
+        <Button type="submit">Add</Button>
       </form>
-      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+      {error && <p className="text-danger text-sm mb-3">{error}</p>}
       <ul className="flex flex-col gap-2 text-sm">
         {suppliers?.map((s) => (
-          <li key={s.id} className="border rounded px-3 py-2">{s.name} {s.email && <span className="text-gray-500">· {s.email}</span>}</li>
+          <li key={s.id} className="bg-surface border border-border rounded-lg px-3 py-2.5">
+            {s.name} {s.email && <span className="text-muted">· {s.email}</span>}
+          </li>
         ))}
-        {suppliers?.length === 0 && <p className="text-gray-500">No suppliers yet.</p>}
+        {suppliers?.length === 0 && <EmptyState>No suppliers yet.</EmptyState>}
       </ul>
     </div>
   );

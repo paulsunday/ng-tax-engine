@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { RequireAuth } from "@/components/RequireAuth";
 import { CompanySubNav } from "@/components/CompanySubNav";
+import { Button, Input, PageHeader, Table, Thead, Th, Td, Tr } from "@/components/ui";
 
 interface ScenarioRow {
   id: string;
@@ -58,49 +59,57 @@ function ScenariosPage() {
   return (
     <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
       <CompanySubNav companyId={companyId} active="Scenarios" />
-      <h1 className="text-lg font-semibold mb-2">Profit / Loss Scenarios</h1>
-      <p className="text-xs text-gray-500 mb-4">
-        Every figure below traces to a real, already-existing row (an unposted draft invoice/expense, or depreciation calculable from an asset already on file) — nothing here is fabricated.
-      </p>
+      <PageHeader
+        title="Profit / Loss Scenarios"
+        subtitle="Every figure below traces to a real, already-existing row (an unposted draft invoice/expense, or depreciation calculable from an asset already on file) — nothing here is fabricated."
+      />
 
-      <div className="border rounded p-4 mb-6 flex flex-wrap items-end gap-3">
+      <div className="bg-surface border border-border rounded-xl p-5 mb-6 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">Period start</label>
-          <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="border rounded px-3 py-2 text-sm" />
+          <label className="text-xs text-muted">Period start</label>
+          <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">Period end</label>
-          <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="border rounded px-3 py-2 text-sm" />
+          <label className="text-xs text-muted">Period end</label>
+          <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
         </div>
-        <button onClick={() => generate("NORMAL")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">Generate Normal</button>
-        <button onClick={() => generate("PROFIT_SCENARIO")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">Generate Profit</button>
-        <button onClick={() => generate("LOSS_SCENARIO")} disabled={busy} className="bg-black text-white rounded px-3 py-2 text-sm disabled:opacity-50">Generate Loss</button>
-        <button onClick={loadCompare} className="text-blue-600 hover:underline text-sm">Refresh comparison</button>
+        <Button onClick={() => generate("NORMAL")} disabled={busy}>
+          Generate Normal
+        </Button>
+        <Button onClick={() => generate("PROFIT_SCENARIO")} disabled={busy}>
+          Generate Profit
+        </Button>
+        <Button onClick={() => generate("LOSS_SCENARIO")} disabled={busy}>
+          Generate Loss
+        </Button>
+        <Button variant="ghost" onClick={loadCompare}>
+          Refresh comparison
+        </Button>
       </div>
 
-      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+      {error && <p className="text-danger text-sm mb-3">{error}</p>}
 
       {compare && (
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left text-gray-500 border-b">
-              <th className="py-2">Scenario</th>
-              <th>Accounting profit</th>
-              <th>Taxable profit</th>
-              <th>Tax liability</th>
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Scenario</Th>
+              <Th>Accounting profit</Th>
+              <Th>Taxable profit</Th>
+              <Th>Tax liability</Th>
             </tr>
-          </thead>
+          </Thead>
           <tbody>
             {([["Normal", compare.normal], ["Profit", compare.profitScenario], ["Loss", compare.lossScenario]] as const).map(([label, row]) => (
-              <tr key={label} className="border-b">
-                <td className="py-2">{label}</td>
-                <td>{row ? `₦${Number(row.accountingProfitNgn).toLocaleString()}` : "—"}</td>
-                <td>{row ? `₦${Number(row.taxableProfitNgn).toLocaleString()}` : "—"}</td>
-                <td>{row ? `₦${Number(row.taxLiabilityNgn).toLocaleString()}` : "—"}</td>
-              </tr>
+              <Tr key={label}>
+                <Td className="font-medium">{label}</Td>
+                <Td>{row ? `₦${Number(row.accountingProfitNgn).toLocaleString()}` : "—"}</Td>
+                <Td>{row ? `₦${Number(row.taxableProfitNgn).toLocaleString()}` : "—"}</Td>
+                <Td>{row ? `₦${Number(row.taxLiabilityNgn).toLocaleString()}` : "—"}</Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </div>
   );

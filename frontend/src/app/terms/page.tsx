@@ -3,10 +3,10 @@ export const TERMS_VERSION = "2026-10-07b";
 export default function TermsPage() {
   return (
     <div className="max-w-2xl mx-auto mt-10 px-4 pb-20 text-sm leading-relaxed">
-      <h1 className="text-xl font-semibold mb-2">Terms &amp; Conditions</h1>
-      <p className="text-gray-500 mb-6">Version {TERMS_VERSION}</p>
+      <h1 className="text-xl font-semibold tracking-tight mb-2">Terms &amp; Conditions</h1>
+      <p className="text-muted mb-6">Version {TERMS_VERSION}</p>
 
-      <div className="border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 rounded p-4 mb-8 text-sm">
+      <div className="border border-warning-border bg-warning-surface text-warning-foreground rounded-xl p-4 mb-8 text-sm">
         <strong>Not legal advice, and not exhaustive.</strong> This document is a
         general-purpose template covering the areas of Nigerian law most relevant to using
         this platform (tax administration, data protection, and general contract/consumer
