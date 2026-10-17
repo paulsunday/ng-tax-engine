@@ -27,7 +27,7 @@ function AdminTaxRulesPage() {
 
   if (!claims?.isPlatformAdmin && !claims?.isTaxRuleApprover) {
     return (
-      <div className="max-w-2xl mx-auto mt-10 px-4 text-sm">
+      <div className="max-w-6xl mx-auto mt-10 px-6 text-sm">
         <p className="text-muted">
           This page is restricted to platform administrators and designated tax-rule approvers. A real, qualified tax
           professional must review and approve each statutory rule before it can drive a calculation — this is a
@@ -38,7 +38,7 @@ function AdminTaxRulesPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 pb-16">
       <PageHeader
         title="Tax Rule Governance"
         subtitle="No calculation uses a rule until it reaches ACTIVE status via this real approval workflow — AI research/verification never substitutes for a qualified professional's sign-off here."

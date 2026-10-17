@@ -26,37 +26,39 @@ export function Nav() {
   const { claims, logout } = useAuth();
 
   return (
-    <nav className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-7">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-sm text-foreground">
-          <Logomark />
-          NG Tax Engine
-        </Link>
-        {claims?.organizationId && <NavLink href="/">Companies</NavLink>}
-        {(claims?.isPlatformAdmin || claims?.isTaxRuleApprover) && <NavLink href="/admin/tax-rules">Tax Rules</NavLink>}
-      </div>
-      <div className="flex items-center gap-5 text-sm">
-        {claims ? (
-          <>
-            <span className="text-muted hidden sm:inline">
-              {claims.email}
-              {claims.roleName ? ` · ${claims.roleName}` : ""}
-            </span>
-            {!claims.organizationId && (
-              <Link href="/select-organization" className="text-primary hover:underline font-medium">
-                Select organization
-              </Link>
-            )}
-            <NavLink href="/settings">Settings</NavLink>
-            <button onClick={logout} className="text-danger hover:underline">
-              Log out
-            </button>
-          </>
-        ) : (
-          <Link href="/login" className="text-primary hover:underline font-medium">
-            Log in
+    <nav className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur shadow-sm">
+      <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-7">
+          <Link href="/" className="flex items-center gap-2 font-semibold text-sm text-foreground">
+            <Logomark />
+            NG Tax Engine
           </Link>
-        )}
+          {claims?.organizationId && <NavLink href="/">Companies</NavLink>}
+          {(claims?.isPlatformAdmin || claims?.isTaxRuleApprover) && <NavLink href="/admin/tax-rules">Tax Rules</NavLink>}
+        </div>
+        <div className="flex items-center gap-5 text-sm">
+          {claims ? (
+            <>
+              <span className="text-muted hidden sm:inline">
+                {claims.email}
+                {claims.roleName ? ` · ${claims.roleName}` : ""}
+              </span>
+              {!claims.organizationId && (
+                <Link href="/select-organization" className="text-primary hover:underline font-medium">
+                  Select organization
+                </Link>
+              )}
+              <NavLink href="/settings">Settings</NavLink>
+              <button onClick={logout} className="text-danger hover:underline">
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link href="/login" className="text-primary hover:underline font-medium">
+              Log in
+            </Link>
+          )}
+        </div>
       </div>
     </nav>
   );

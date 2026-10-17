@@ -50,7 +50,7 @@ function SettingsPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-xl pb-16">
       <PageHeader title="Account & Privacy" />
 
       <Card className="mb-6">

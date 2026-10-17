@@ -67,13 +67,13 @@ function InvoiceDetailView() {
   }
 
   if (!invoice) {
-    return <div className="max-w-xl mx-auto mt-10 px-4">{error ? <p className="text-danger text-sm">{error}</p> : <p className="text-sm text-muted">Loading…</p>}</div>;
+    return <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-xl">{error ? <p className="text-danger text-sm">{error}</p> : <p className="text-sm text-muted">Loading…</p>}</div>;
   }
 
   const outstanding = Number(invoice.totalNgn) - Number(invoice.amountPaidNgn);
 
   return (
-    <div className="max-w-xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-xl pb-16">
       <Link href={`/companies/${companyId}/invoices`} className="text-sm text-primary hover:underline">
         ← Invoices
       </Link>

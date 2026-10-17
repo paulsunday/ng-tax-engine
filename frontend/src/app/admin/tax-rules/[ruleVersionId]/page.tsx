@@ -62,15 +62,15 @@ function RuleDetailView() {
   }
 
   if (!claims?.isPlatformAdmin && !claims?.isTaxRuleApprover) {
-    return <div className="max-w-2xl mx-auto mt-10 px-4 text-sm text-muted">Restricted to platform administrators and designated tax-rule approvers.</div>;
+    return <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-3xl text-sm text-muted">Restricted to platform administrators and designated tax-rule approvers.</div>;
   }
 
   if (!rule) {
-    return <div className="max-w-2xl mx-auto mt-10 px-4">{error ? <p className="text-danger text-sm">{error}</p> : <p className="text-sm text-muted">Loading…</p>}</div>;
+    return <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-3xl">{error ? <p className="text-danger text-sm">{error}</p> : <p className="text-sm text-muted">Loading…</p>}</div>;
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-3xl pb-16">
       <Link href="/admin/tax-rules" className="text-sm text-primary hover:underline">
         ← Tax rules
       </Link>

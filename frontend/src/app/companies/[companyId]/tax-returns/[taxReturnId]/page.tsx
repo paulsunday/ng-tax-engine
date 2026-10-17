@@ -80,7 +80,7 @@ function TaxReturnDetailView() {
 
   if (!taxReturn) {
     return (
-      <div className="max-w-2xl mx-auto mt-10 px-4">
+      <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-3xl">
         {error && <p className="text-danger text-sm">{error}</p>}
         {!error && <p className="text-sm text-muted">Loading…</p>}
       </div>
@@ -88,7 +88,7 @@ function TaxReturnDetailView() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 *:max-w-3xl pb-16">
       <Link href={`/companies/${companyId}`} className="text-sm text-primary hover:underline">
         ← Back to company
       </Link>

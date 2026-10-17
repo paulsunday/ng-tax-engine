@@ -39,7 +39,7 @@ export default function TermsPage() {
         to a specific, version-controlled statutory rule, and a calculation is withheld
         (reported as &quot;pending rule approval&quot;) rather than guessed whenever the
         governing rule has not yet been confirmed by a qualified tax professional within
-        your organization — the tool is deliberately built to defer to that professional's
+        your organization — the tool is deliberately built to defer to that professional&apos;s
         sign-off rather than act on its own authority. The accountant, auditor, or firm
         operating this platform remains solely responsible for the accuracy of any
         company&apos;s tax filings and for holding the licenses/registrations Nigerian law

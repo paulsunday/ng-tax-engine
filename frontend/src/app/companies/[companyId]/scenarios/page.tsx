@@ -57,7 +57,7 @@ function ScenariosPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 pb-16">
       <CompanySubNav companyId={companyId} active="Scenarios" />
       <PageHeader
         title="Profit / Loss Scenarios"

@@ -42,7 +42,7 @@ function ExpensesPage() {
   const expenseAccounts = accounts.filter((a) => a.type === "EXPENSE" || a.type === "ASSET");
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 pb-16">
       <CompanySubNav companyId={companyId} active="Expenses" />
       <PageHeader
         title="Expenses"

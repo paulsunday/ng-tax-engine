@@ -55,7 +55,7 @@ function CompanyDetail() {
   useEffect(reload, [companyId]);
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 px-4 pb-16">
+    <div className="max-w-6xl mx-auto mt-10 px-6 pb-16">
       <Link href="/" className="text-sm text-primary hover:underline">
         ← All companies
       </Link>
