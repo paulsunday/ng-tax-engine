@@ -215,7 +215,7 @@ throughout, by design — it is not a substitute for the migration-validation st
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every PR/push to `master`/`main`: lint, type-check,
+`.github/workflows/ci.yml` runs on every PR/push to `master`: lint, type-check,
 `prisma validate`, `prisma migrate deploy` against a real ephemeral Postgres service
 container (genuine migration validation, not just a schema syntax check), the full test
 suite, the build, and a dependency audit (reporting only at the `critical` threshold — see

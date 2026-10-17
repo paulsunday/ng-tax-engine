@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [master, main]
+    branches: [master]
   push:
-    branches: [master, main]
+    branches: [master]
 
 # No production deployment job exists in this workflow on purpose — deployment is a
 # separate, manual `railway up` step today (see README.md). Nothing here can push to
