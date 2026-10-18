@@ -3,7 +3,11 @@ import { IntegrationConnection } from "@prisma/client";
 import * as crypto from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { CompaniesService } from "../companies/companies.service";
+import { CustomersService } from "../customers/customers.service";
+import { InvoicesService } from "../invoices/invoices.service";
+import { JournalService } from "../journal/journal.service";
 import { AuditLogService } from "../audit-log/audit-log.service";
+import { SyncSubscriberInvoiceDto } from "./dto/sync-subscriber-invoice.dto";
 
 export const INTEGRATION_KEY_PREFIX = "nwb_";
 const KEY_DISPLAY_PREFIX_LENGTH = 12;
@@ -27,6 +31,9 @@ export class IntegrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly companies: CompaniesService,
+    private readonly customers: CustomersService,
+    private readonly invoices: InvoicesService,
+    private readonly journal: JournalService,
     private readonly auditLog: AuditLogService
   ) {}
 
@@ -177,5 +184,108 @@ export class IntegrationsService {
     });
 
     return { url: `${process.env.FRONTEND_URL ?? ""}/sso#code=${code}`, expiresAt };
+  }
+
+  /**
+   * Ingests one subscriber invoice/payment event from a connected billing system (e.g. an
+   * ISP's own tenant-billing-api, via its own stored copy of this connection's key) into
+   * this company's real accounting ledger. PAYMENT_CAPTURED creates+posts an Invoice and
+   * records the payment against it in one call (the source system only ever tells us about
+   * orders that are ALREADY paid — there's no separate "invoice sent, awaiting payment"
+   * state to represent). REFUND_ISSUED fully reverses the original posting via
+   * JournalService.voidEntry rather than inventing partial-refund logic the source system
+   * has no concept of (its own orders.payment_status is a flat 'refunded', never a partial
+   * amount).
+   *
+   * Idempotent on orderReference (→ Invoice.invoiceNumber, already unique per company) and
+   * on externalCustomerId (→ Customer.externalRef) — safe to call twice for the same event
+   * (a webhook retry, a reconciliation re-sync), never double-posts or double-reverses.
+   *
+   * The connection's OWN createdByUserId (the person who generated this integration key)
+   * is used as the acting user for every posting — there is no logged-in human on this
+   * machine-to-machine path, and every journal entry's createdBy is non-nullable, so the
+   * key's creator is the most honest "who is accountable for this" attribution available.
+   */
+  async syncSubscriberInvoice(connection: IntegrationConnection, input: SyncSubscriberInvoiceDto) {
+    const { organizationId, companyId, createdByUserId: userId } = connection;
+
+    let customer = await this.prisma.customer.findUnique({
+      where: { companyId_externalRef: { companyId, externalRef: input.externalCustomerId } },
+    });
+    if (!customer) {
+      customer = await this.customers.create(organizationId, companyId, {
+        name: input.customerName,
+        email: input.customerEmail,
+        phone: input.customerPhone,
+        externalRef: input.externalCustomerId,
+      });
+    }
+
+    if (input.eventType === "PAYMENT_CAPTURED") {
+      const existing = await this.prisma.invoice.findUnique({
+        where: { companyId_invoiceNumber: { companyId, invoiceNumber: input.orderReference } },
+      });
+      if (existing) {
+        return { synced: false as const, reason: "ALREADY_SYNCED" as const, invoiceId: existing.id, customerId: customer.id };
+      }
+
+      const paidAt = new Date(input.paidAt);
+      const draft = await this.invoices.create(organizationId, companyId, userId, {
+        customerId: customer.id,
+        invoiceNumber: input.orderReference,
+        issueDate: paidAt,
+        dueDate: paidAt,
+        notes: `Synced from connected app "${connection.label}"`,
+        // vatRate: 0 — the connected billing system has no VAT concept of its own
+        // (orders.amount_naira is a flat charge), so 0 is the honest figure, never a guess.
+        items: [{ description: input.description, quantity: 1, unitPriceNgn: input.amountNgn, vatRate: 0 }],
+      });
+      const posted = await this.invoices.post(organizationId, companyId, userId, draft.id);
+      const paid = await this.invoices.recordPayment(organizationId, companyId, userId, posted.id, input.amountNgn, paidAt, "EXTERNAL_SYNC", input.orderReference);
+
+      await this.auditLog.record({
+        organizationId,
+        userId,
+        action: "SYNC_SUBSCRIBER_INVOICE",
+        objectType: "Invoice",
+        objectId: paid.id,
+        newValue: { orderReference: input.orderReference, amountNgn: input.amountNgn, source: connection.label },
+      });
+
+      return { synced: true as const, invoiceId: paid.id, customerId: customer.id };
+    }
+
+    // REFUND_ISSUED
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { companyId_invoiceNumber: { companyId, invoiceNumber: input.orderReference } },
+      include: { payments: true },
+    });
+    if (!invoice) {
+      return { synced: false as const, reason: "NOTHING_TO_REVERSE" as const, customerId: customer.id };
+    }
+
+    const journalEntryIdsToVoid = [invoice.journalEntryId, ...invoice.payments.map((p) => p.journalEntryId)].filter((id): id is string => Boolean(id));
+    let reversedSomething = false;
+    for (const journalEntryId of journalEntryIdsToVoid) {
+      const entry = await this.prisma.journalEntry.findUnique({ where: { id: journalEntryId } });
+      if (entry?.status === "POSTED") {
+        await this.journal.voidEntry(organizationId, companyId, userId, entry.id, `Refund reported by connected app "${connection.label}": ${input.orderReference}`);
+        reversedSomething = true;
+      }
+    }
+
+    if (reversedSomething) {
+      await this.prisma.invoice.update({ where: { id: invoice.id }, data: { status: "VOID" } });
+      await this.auditLog.record({
+        organizationId,
+        userId,
+        action: "REVERSE_SUBSCRIBER_INVOICE",
+        objectType: "Invoice",
+        objectId: invoice.id,
+        newValue: { orderReference: input.orderReference, source: connection.label },
+      });
+    }
+
+    return { synced: reversedSomething, reason: reversedSomething ? undefined : ("ALREADY_REVERSED" as const), invoiceId: invoice.id, customerId: customer.id };
   }
 }
