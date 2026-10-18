@@ -7,6 +7,9 @@ export interface CreateCustomerInput {
   email?: string;
   phone?: string;
   address?: string;
+  // Set only by a connected-app sync (IntegrationsService.syncSubscriberInvoice) — null for
+  // every customer entered by hand. See Customer.externalRef's own schema comment.
+  externalRef?: string;
 }
 
 @Injectable()

@@ -9,6 +9,7 @@ import { IntegrationsService } from "./integrations.service";
 import { IntegrationKeyGuard, CurrentConnection } from "./integration-key.guard";
 import { CreateConnectionDto } from "./dto/create-connection.dto";
 import { SsoRequestDto } from "./dto/sso-request.dto";
+import { SyncSubscriberInvoiceDto } from "./dto/sync-subscriber-invoice.dto";
 
 /** Users of the company's organization create and revoke connection keys. */
 @Controller("companies/:companyId/integrations")
@@ -54,5 +55,11 @@ export class IntegrationApiController {
   @HttpCode(200)
   sso(@CurrentConnection() connection: IntegrationConnection, @Body() dto: SsoRequestDto) {
     return this.integrations.createSsoLink(connection, dto.email);
+  }
+
+  @Post("subscriber-invoices")
+  @HttpCode(200)
+  syncSubscriberInvoice(@CurrentConnection() connection: IntegrationConnection, @Body() dto: SyncSubscriberInvoiceDto) {
+    return this.integrations.syncSubscriberInvoice(connection, dto);
   }
 }

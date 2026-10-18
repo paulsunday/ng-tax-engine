@@ -1014,12 +1014,20 @@ model Customer {
   email          String?
   phone          String?
   address        String?
+  // Opaque ID from an external system this customer was synced from (e.g. an ISP's
+  // billing platform customer_id, via the /integrations/v1 connected-app channel) — null
+  // for every manually-entered customer. The idempotency key an external sync uses to find
+  // "is this the same subscriber as before" without re-matching on name/phone/email, which
+  // can legitimately change. Scoped per company, not globally unique, since two different
+  // connected systems (or two companies) could coincidentally reuse the same external ID.
+  externalRef    String?
   createdAt      DateTime @default(now())
 
   invoices       Invoice[]
   journalLines   JournalLine[]
   payments       AccountingPayment[]
 
+  @@unique([companyId, externalRef])
   @@index([organizationId, companyId])
 }
 
